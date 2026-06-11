@@ -76,6 +76,18 @@ and renders two live head maps side by side. Each sensor is colored from
 black/red through green based on the `0..4` quality scale, while each panel also
 shows its overall percentage.
 
+The viewer uses normalized coordinates stored in `head_image_coords.json`, so the
+head image only needs to be calibrated once. To create or update that file:
+
+```bash
+python -m pipenv run python examples/calibrate_head_image.py
+```
+
+Click the sensor centers in this order:
+
+* `AF3`, `F7`, `F3`, `FC5`, `T7`, `P7`, `O1`, `O2`, `P8`, `T8`, `FC6`, `F4`, `F8`, `AF4`
+* `OVERALL`
+
 To launch raw EEG, the Cortex quality streams, and the dual quality viewer from a
 single command:
 

@@ -1,3 +1,4 @@
+import json
 import tkinter as tk
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,12 +12,14 @@ PANEL_IMAGE_CANDIDATES = (
     Path(__file__).resolve().parents[1] / "head_image.png",
     Path(__file__).resolve().parents[1] / "example_cq.png",
 )
+CALIBRATION_PATH = Path(__file__).resolve().parents[1] / "head_image_coords.json"
 PANEL_WIDTH = 462
 PANEL_HEIGHT = 510
 PANEL_GAP = 18
 WINDOW_PADDING = 12
 HEADER_HEIGHT = 34
-STATUS_HEIGHT = 32
+SENSOR_RADIUS = 17
+RING_RADIUS = 21
 CQ_CHANNEL_ORDER = [
     "Battery",
     "Signal",
@@ -72,22 +75,6 @@ SENSOR_NAMES = [
     "F8",
     "AF4",
 ]
-SENSOR_POSITIONS = {
-    "AF3": (173, 126),
-    "F7": (119, 143),
-    "FC5": (119, 197),
-    "F3": (173, 198),
-    "T7": (84, 267),
-    "P7": (132, 393),
-    "O1": (175, 460),
-    "O2": (257, 460),
-    "P8": (301, 393),
-    "T8": (347, 267),
-    "FC6": (308, 198),
-    "F4": (259, 197),
-    "F8": (341, 143),
-    "AF4": (258, 126),
-}
 QUALITY_COLORS = {
     0: "#111111",
     1: "#d84a3a",
@@ -119,74 +106,79 @@ def overall_to_color(overall: float) -> str:
     return "#d84a3a"
 
 
+def load_calibration() -> dict:
+    if not CALIBRATION_PATH.exists():
+        raise FileNotFoundError(
+            f"Calibration file not found at {CALIBRATION_PATH}. Run examples/calibrate_head_image.py first."
+        )
+    return json.loads(CALIBRATION_PATH.read_text())
+
+
+def pick_panel_image() -> Path:
+    for path in PANEL_IMAGE_CANDIDATES:
+        if path.exists():
+            return path
+    raise FileNotFoundError("No panel image found. Expected head_image.png or example_cq.png in the repo root.")
+
+
+def scale_point(panel_left: int, panel_top: int, norm_x: float, norm_y: float) -> tuple[float, float]:
+    return (
+        panel_left + (norm_x * PANEL_WIDTH),
+        panel_top + (norm_y * PANEL_HEIGHT),
+    )
+
+
 class QualityPanel:
     def __init__(
         self,
         canvas: tk.Canvas,
         title: str,
-        x_offset: int,
+        panel_left: int,
         channel_order: list[str],
-        overall_key: str,
-        left_metric_lines: list[tuple[str, str]],
+        metric_labels: list[tuple[str, str]],
+        calibration: dict,
+        panel_image: tk.PhotoImage,
     ) -> None:
         self.canvas = canvas
         self.title = title
-        self.x_offset = x_offset
+        self.panel_left = panel_left
+        self.panel_top = HEADER_HEIGHT
         self.channel_index = {name: index for index, name in enumerate(channel_order)}
-        self.overall_key = overall_key
-        self.left_metric_lines = left_metric_lines
+        self.metric_labels = metric_labels
+        self.calibration = calibration
+        self.panel_image = panel_image
         self.sensor_glyphs: dict[str, SensorGlyph] = {}
         self.metric_text_ids: dict[str, int] = {}
         self.overall_text_id: int | None = None
-        self.background_image: tk.PhotoImage | None = None
+        self.overall_background_id: int | None = None
         self.draw()
 
     def draw(self) -> None:
         self.canvas.create_text(
-            self.x_offset + PANEL_WIDTH // 2,
+            self.panel_left + PANEL_WIDTH / 2,
             20,
             text=self.title,
             fill="#23374d",
             font=("Helvetica", 16, "bold"),
         )
+        self.canvas.create_image(self.panel_left, self.panel_top, image=self.panel_image, anchor="nw")
 
-        panel_top = HEADER_HEIGHT
-        panel_image_path = next((path for path in PANEL_IMAGE_CANDIDATES if path.exists()), None)
-        if panel_image_path:
-            self.background_image = tk.PhotoImage(file=str(panel_image_path))
-            self.canvas.create_image(self.x_offset, panel_top, image=self.background_image, anchor="nw")
-        else:
-            self.canvas.create_rectangle(
-                self.x_offset,
-                panel_top,
-                self.x_offset + PANEL_WIDTH,
-                panel_top + PANEL_HEIGHT,
-                fill="#dce9fb",
-                outline="#263648",
-                width=2,
+        for sensor_name in SENSOR_NAMES:
+            norm_x, norm_y = self.calibration["sensors"][sensor_name]
+            x, y = scale_point(self.panel_left, self.panel_top, norm_x, norm_y)
+            ring_id = self.canvas.create_oval(
+                x - RING_RADIUS, y - RING_RADIUS, x + RING_RADIUS, y + RING_RADIUS, fill="#111111", outline=""
             )
+            oval_id = self.canvas.create_oval(
+                x - SENSOR_RADIUS, y - SENSOR_RADIUS, x + SENSOR_RADIUS, y + SENSOR_RADIUS, fill=QUALITY_COLORS[0], outline=""
+            )
+            text_id = self.canvas.create_text(x, y, text=sensor_name, fill="white", font=("Helvetica", 10, "bold"))
+            self.sensor_glyphs[sensor_name] = SensorGlyph(oval_id=oval_id, text_id=text_id, ring_id=ring_id)
 
-        self.canvas.create_rectangle(
-            self.x_offset + 320,
-            panel_top + 430,
-            self.x_offset + PANEL_WIDTH - 6,
-            panel_top + PANEL_HEIGHT - 6,
-            fill="white",
-            outline="white",
-        )
-
-        for name, (sensor_x, sensor_y) in SENSOR_POSITIONS.items():
-            x = self.x_offset + sensor_x
-            y = panel_top + sensor_y
-            ring_id = self.canvas.create_oval(x - 21, y - 21, x + 21, y + 21, fill="#111111", outline="")
-            oval_id = self.canvas.create_oval(x - 17, y - 17, x + 17, y + 17, fill=QUALITY_COLORS[0], outline="")
-            text_id = self.canvas.create_text(x, y, text=name, fill="white", font=("Helvetica", 10, "bold"))
-            self.sensor_glyphs[name] = SensorGlyph(oval_id=oval_id, text_id=text_id, ring_id=ring_id)
-
-        line_y = panel_top + PANEL_HEIGHT + 20
-        for key, label in self.left_metric_lines:
+        line_y = self.panel_top + PANEL_HEIGHT + 20
+        for key, label in self.metric_labels:
             self.metric_text_ids[key] = self.canvas.create_text(
-                self.x_offset + 16,
+                self.panel_left + 16,
                 line_y,
                 text=f"{label}: --",
                 anchor="w",
@@ -195,33 +187,56 @@ class QualityPanel:
             )
             line_y += 26
 
+        overall_x, overall_y = self.calibration["overall_anchor"]
+        overall_fill_x, overall_fill_y = scale_point(self.panel_left, self.panel_top, overall_x, overall_y)
+        self.overall_background_id = self.canvas.create_rectangle(
+            overall_fill_x - 52,
+            overall_fill_y - 24,
+            overall_fill_x + 52,
+            overall_fill_y + 24,
+            fill="white",
+            outline="white",
+        )
         self.overall_text_id = self.canvas.create_text(
-            self.x_offset + 385,
-            panel_top + 442,
+            overall_fill_x,
+            overall_fill_y,
             text="--%",
             fill="#8ad448",
             font=("Helvetica", 28, "bold"),
         )
+        self.update_overall_badge("--%", "#8ad448")
 
     def update_sensor_scores(self, sample: list[float]) -> None:
         for sensor_name in SENSOR_NAMES:
             score = sample[self.channel_index[sensor_name]]
-            glyph = self.sensor_glyphs[sensor_name]
-            self.canvas.itemconfigure(glyph.oval_id, fill=score_to_color(score))
+            self.canvas.itemconfigure(self.sensor_glyphs[sensor_name].oval_id, fill=score_to_color(score))
 
     def update_metrics(self, metrics: dict[str, str], overall: float) -> None:
         for key, value in metrics.items():
             self.canvas.itemconfigure(self.metric_text_ids[key], text=value)
+        self.update_overall_badge(f"{overall:.0f}%", overall_to_color(overall))
 
-        self.canvas.itemconfigure(
-            self.overall_text_id,
-            text=f"{overall:.0f}%",
-            fill=overall_to_color(overall),
+    def update_overall_badge(self, text: str, color: str) -> None:
+        self.canvas.itemconfigure(self.overall_text_id, text=text, fill=color)
+        bbox = self.canvas.bbox(self.overall_text_id)
+        if not bbox:
+            return
+        pad_x = 12
+        pad_y = 10
+        self.canvas.coords(
+            self.overall_background_id,
+            bbox[0] - pad_x,
+            bbox[1] - pad_y,
+            bbox[2] + pad_x,
+            bbox[3] + pad_y,
         )
 
 
 class DualQualityViewer:
     def __init__(self) -> None:
+        self.calibration = load_calibration()
+        self.panel_image = tk.PhotoImage(file=str(pick_panel_image()))
+
         self.root = tk.Tk()
         self.root.title("Emotiv Contact And EEG Quality")
         self.root.configure(bg="white")
@@ -238,18 +253,20 @@ class DualQualityViewer:
         self.cq_panel = QualityPanel(
             canvas=self.canvas,
             title="Contact Quality",
-            x_offset=WINDOW_PADDING,
+            panel_left=WINDOW_PADDING,
             channel_order=CQ_CHANNEL_ORDER,
-            overall_key="OVERALL",
-            left_metric_lines=[("Battery", "Battery"), ("Signal", "Signal")],
+            metric_labels=[("Battery", "Battery"), ("Signal", "Signal")],
+            calibration=self.calibration,
+            panel_image=self.panel_image,
         )
         self.eq_panel = QualityPanel(
             canvas=self.canvas,
             title="EEG Quality",
-            x_offset=WINDOW_PADDING + PANEL_WIDTH + PANEL_GAP,
+            panel_left=WINDOW_PADDING + PANEL_WIDTH + PANEL_GAP,
             channel_order=EQ_CHANNEL_ORDER,
-            overall_key="overall",
-            left_metric_lines=[("batteryPercent", "Battery"), ("sampleRateQuality", "Rate")],
+            metric_labels=[("batteryPercent", "Battery"), ("sampleRateQuality", "Rate")],
+            calibration=self.calibration,
+            panel_image=self.panel_image,
         )
 
         self.cq_inlet: StreamInlet | None = None
@@ -257,7 +274,6 @@ class DualQualityViewer:
 
     def connect(self) -> None:
         self.status_var.set("Resolving LSL quality streams...")
-
         cq_streams = resolve_byprop("name", CQ_STREAM_NAME, timeout=2)
         eq_streams = resolve_byprop("name", EQ_STREAM_NAME, timeout=2)
         if not cq_streams or not eq_streams:
@@ -277,7 +293,6 @@ class DualQualityViewer:
 
     def poll(self) -> None:
         updated = False
-
         if self.cq_inlet:
             while True:
                 sample, _ = self.cq_inlet.pull_sample(timeout=0.0)
@@ -285,7 +300,6 @@ class DualQualityViewer:
                     break
                 self.update_cq(sample)
                 updated = True
-
         if self.eq_inlet:
             while True:
                 sample, _ = self.eq_inlet.pull_sample(timeout=0.0)
@@ -293,10 +307,8 @@ class DualQualityViewer:
                     break
                 self.update_eq(sample)
                 updated = True
-
         if not updated:
             self.status_var.set("Connected to both quality streams")
-
         self.root.after(100, self.poll)
 
     def update_cq(self, sample: list[float]) -> None:
