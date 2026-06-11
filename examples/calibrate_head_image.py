@@ -44,8 +44,32 @@ class HeadImageCalibrator:
         self.width = self.image.width()
         self.height = self.image.height()
 
-        self.canvas = tk.Canvas(self.root, width=self.width, height=self.height, highlightthickness=0)
-        self.canvas.pack()
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        viewport_width = min(self.width, max(640, screen_width - 120))
+        viewport_height = min(self.height, max(480, screen_height - 180))
+
+        canvas_frame = tk.Frame(self.root)
+        canvas_frame.pack(fill="both", expand=True)
+
+        self.canvas = tk.Canvas(
+            canvas_frame,
+            width=viewport_width,
+            height=viewport_height,
+            highlightthickness=0,
+            xscrollincrement=20,
+            yscrollincrement=20,
+            scrollregion=(0, 0, self.width, self.height),
+        )
+        x_scroll = tk.Scrollbar(canvas_frame, orient="horizontal", command=self.canvas.xview)
+        y_scroll = tk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(xscrollcommand=x_scroll.set, yscrollcommand=y_scroll.set)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        y_scroll.grid(row=0, column=1, sticky="ns")
+        x_scroll.grid(row=1, column=0, sticky="ew")
+        canvas_frame.grid_rowconfigure(0, weight=1)
+        canvas_frame.grid_columnconfigure(0, weight=1)
+
         self.canvas.create_image(0, 0, image=self.image, anchor="nw")
         self.canvas.bind("<Button-1>", self.on_click)
 

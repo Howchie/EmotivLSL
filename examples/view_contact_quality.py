@@ -243,8 +243,32 @@ class DualQualityViewer:
 
         canvas_width = (WINDOW_PADDING * 2) + (PANEL_WIDTH * 2) + PANEL_GAP
         canvas_height = HEADER_HEIGHT + PANEL_HEIGHT + 72
-        self.canvas = tk.Canvas(self.root, width=canvas_width, height=canvas_height, bg="white", highlightthickness=0)
-        self.canvas.pack()
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        viewport_width = min(canvas_width, max(640, screen_width - 120))
+        viewport_height = min(canvas_height, max(480, screen_height - 180))
+
+        canvas_frame = tk.Frame(self.root, bg="white")
+        canvas_frame.pack(fill="both", expand=True)
+
+        self.canvas = tk.Canvas(
+            canvas_frame,
+            width=viewport_width,
+            height=viewport_height,
+            bg="white",
+            highlightthickness=0,
+            xscrollincrement=20,
+            yscrollincrement=20,
+        )
+        x_scroll = tk.Scrollbar(canvas_frame, orient="horizontal", command=self.canvas.xview)
+        y_scroll = tk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(xscrollcommand=x_scroll.set, yscrollcommand=y_scroll.set, scrollregion=(0, 0, canvas_width, canvas_height))
+
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        y_scroll.grid(row=0, column=1, sticky="ns")
+        x_scroll.grid(row=1, column=0, sticky="ew")
+        canvas_frame.grid_rowconfigure(0, weight=1)
+        canvas_frame.grid_columnconfigure(0, weight=1)
 
         self.status_var = tk.StringVar(value="Looking for LSL quality streams...")
         self.status_label = tk.Label(self.root, textvariable=self.status_var, bg="white", fg="#333333")
