@@ -73,8 +73,12 @@ class CortexClient:
 def add_channel_metadata(info: StreamInfo, labels: list[str]) -> None:
     chns = info.desc().append_child("channels")
     for label in labels:
+        if isinstance(label, list):
+            label_text = "/".join(str(part) for part in label)
+        else:
+            label_text = str(label)
         ch = chns.append_child("channel")
-        ch.append_child_value("label", label)
+        ch.append_child_value("label", label_text)
         ch.append_child_value("type", "Quality")
         ch.append_child_value("unit", "score")
 
@@ -269,7 +273,7 @@ def bridge() -> None:
             spec = STREAM_SPECS[stream_name]
             outlets[stream_name] = create_outlet(stream_name, labels, spec.lsl_name, spec.lsl_type)
             print(
-                f"Publishing {stream_name} as LSL '{spec.lsl_name}' with columns {labels}",
+                f"Publishing {stream_name} as LSL '{spec.lsl_name}' with columns {labels!r}",
                 file=sys.stderr,
                 flush=True,
             )
