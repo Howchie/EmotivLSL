@@ -87,11 +87,20 @@ class HeadImageCalibrator:
 
     def on_click(self, event) -> None:
         key = CLICK_SEQUENCE[self.index]
-        norm_x = event.x / self.width
-        norm_y = event.y / self.height
+        canvas_x = self.canvas.canvasx(event.x)
+        canvas_y = self.canvas.canvasy(event.y)
+        norm_x = canvas_x / self.width
+        norm_y = canvas_y / self.height
 
-        self.canvas.create_oval(event.x - 5, event.y - 5, event.x + 5, event.y + 5, fill="red", outline="")
-        self.canvas.create_text(event.x + 10, event.y - 10, text=key, anchor="w", fill="red", font=("Helvetica", 10, "bold"))
+        self.canvas.create_oval(canvas_x - 5, canvas_y - 5, canvas_x + 5, canvas_y + 5, fill="red", outline="")
+        self.canvas.create_text(
+            canvas_x + 10,
+            canvas_y - 10,
+            text=key,
+            anchor="w",
+            fill="red",
+            font=("Helvetica", 10, "bold"),
+        )
 
         if key == "OVERALL":
             self.points["overall_anchor"] = [norm_x, norm_y]
