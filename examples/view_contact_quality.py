@@ -244,6 +244,10 @@ class DualQualityViewer:
         self.root = tk.Tk()
         self.root.title("Emotiv Contact And EEG Quality")
         self.root.configure(bg="white")
+        self.root.geometry("1100x780+80+80")
+        self.root.minsize(900, 600)
+        self.root.bind("<Escape>", lambda _event: self.root.destroy())
+        self.root.bind("<Control-w>", lambda _event: self.root.destroy())
         source_image = tk.PhotoImage(file=str(pick_panel_image()))
         subsample_factor = max(1, (source_image.width() + MAX_PANEL_WIDTH - 1) // MAX_PANEL_WIDTH)
         self.panel_image = source_image.subsample(subsample_factor, subsample_factor)
@@ -376,8 +380,13 @@ class DualQualityViewer:
         )
 
     def run(self) -> None:
+        self.root.after(50, self._raise_window)
         self.root.after(0, self.connect)
         self.root.mainloop()
+
+    def _raise_window(self) -> None:
+        self.root.lift()
+        self.root.focus_force()
 
 
 def main() -> None:
