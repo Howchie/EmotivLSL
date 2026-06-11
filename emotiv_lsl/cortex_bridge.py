@@ -74,17 +74,41 @@ def add_channel_metadata(info: StreamInfo, labels: list[str]) -> None:
     chns = info.desc().append_child("channels")
     for label in labels:
         if isinstance(label, list):
-            label_text = "/".join(str(part) for part in label)
-        else:
-            label_text = str(label)
+            for part in label:
+                ch = chns.append_child("channel")
+                ch.append_child_value("label", str(part))
+                ch.append_child_value("type", "Quality")
+                ch.append_child_value("unit", "score")
+            continue
+
         ch = chns.append_child("channel")
-        ch.append_child_value("label", label_text)
+        ch.append_child_value("label", str(label))
         ch.append_child_value("type", "Quality")
         ch.append_child_value("unit", "score")
 
 
+def flatten_labels(labels: list) -> list[str]:
+    flattened: list[str] = []
+    for label in labels:
+        if isinstance(label, list):
+            flattened.extend(str(part) for part in label)
+        else:
+            flattened.append(str(label))
+    return flattened
+
+
+def flatten_values(values: list) -> list[float]:
+    flattened: list[float] = []
+    for value in values:
+        if isinstance(value, list):
+            flattened.extend(float(part) for part in value)
+        else:
+            flattened.append(float(value))
+    return flattened
+
+
 def create_outlet(stream_name: str, labels: list[str], lsl_name: str, lsl_type: str) -> StreamOutlet:
-    info = StreamInfo(lsl_name, lsl_type, len(labels), 2, "float32")
+    info = StreamInfo(lsl_name, lsl_type, len(flatten_labels(labels)), 2, "float32")
     info.desc().append_child_value("source_stream", stream_name)
     add_channel_metadata(info, labels)
     return StreamOutlet(info)
@@ -289,7 +313,7 @@ def bridge() -> None:
                 if stream_name not in message:
                     continue
 
-                values = [float(value) for value in message[stream_name]]
+                values = flatten_values(message[stream_name])
                 outlet.push_sample(values)
                 if args.print_samples:
                     print(f"{stream_name}: {values}", file=sys.stderr, flush=True)
