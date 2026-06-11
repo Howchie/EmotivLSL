@@ -13,6 +13,8 @@ from config import SRATE
 class EmotivEpocX(EmotivBase):
     READ_SIZE = 32
     LOG_FLUSH_INTERVAL = 256
+    PROBE_READ_ATTEMPTS = 8
+    PROBE_TIMEOUT_MS = 250
 
     CH_NAMES = ['AF3', 'F7', 'F3', 'FC5', 'T7', 'P7',
                 'O1', 'O2', 'P8', 'T8', 'FC6', 'F4', 'F8', 'AF4']
@@ -24,10 +26,39 @@ class EmotivEpocX(EmotivBase):
 
         self.cipher = AES.new(self.get_crypto_key(), AES.MODE_ECB)
 
-    def get_hid_device(self):
+    def get_hid_devices(self) -> list[dict]:
+        devices = []
         for device in hid.enumerate():
-            if device['manufacturer_string'] == 'Emotiv' and device['usage'] == 2:
+            if device.get('manufacturer_string') == 'Emotiv':
+                devices.append(device)
+        return devices
+
+    def describe_hid_device(self, device: dict) -> str:
+        return (
+            f"path={device.get('path')} "
+            f"product={device.get('product_string')} "
+            f"serial={device.get('serial_number')} "
+            f"usage_page={device.get('usage_page')} "
+            f"usage={device.get('usage')} "
+            f"interface_number={device.get('interface_number')}"
+        )
+
+    def print_hid_devices(self, devices: list[dict]) -> None:
+        for index, device in enumerate(devices):
+            print(
+                "INFO| hidif "
+                f"'{index}' ({self.describe_hid_device(device)})",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    def get_hid_device(self):
+        devices = self.get_hid_devices()
+        for device in devices:
+            if device.get('usage') == 2:
                 return device
+        if devices:
+            return devices[0]
 
         raise Exception('Emotiv Epoc X not found')
 
@@ -77,6 +108,52 @@ class EmotivEpocX(EmotivBase):
         if len(data) == self.READ_SIZE + 1 and data[0] == 0:
             return data[1:]
         return None
+
+    def get_streaming_hid_device_info(self):
+        devices = self.get_hid_devices()
+        if not devices:
+            raise Exception('Emotiv Epoc X not found')
+
+        self.print_hid_devices(devices)
+
+        for index, device in enumerate(devices):
+            hid_device = hid.device()
+            hid_device.open_path(device['path'])
+            observed_lengths = set()
+
+            try:
+                for _ in range(self.PROBE_READ_ATTEMPTS):
+                    packet = hid_device.read(self.READ_SIZE, timeout_ms=self.PROBE_TIMEOUT_MS)
+                    if not packet:
+                        continue
+
+                    observed_lengths.add(len(packet))
+                    normalized = self.normalize_encrypted_packet(packet)
+                    if normalized is not None:
+                        print(
+                            f"Using Emotiv HID device [{index}] with packet length {len(packet)}.",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        return device
+
+                if observed_lengths:
+                    print(
+                        f"Emotiv HID device [{index}] produced unsupported packet lengths:"
+                        f" {sorted(observed_lengths)}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"Emotiv HID device [{index}] produced no data during probing.",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+            finally:
+                hid_device.close()
+
+        raise RuntimeError('No Emotiv HID interface produced EEG-sized packets during probing.')
 
     def decode_data(self, data) -> list:
         data = self.decrypt_data(data)
@@ -137,13 +214,14 @@ class EmotivEpocX(EmotivBase):
             log_handle.flush()
             print(f"Logging decrypted packets to {self.packet_log_path.resolve()}", file=sys.stderr, flush=True)
 
-        device = self.get_hid_device()
+        device = self.get_streaming_hid_device_info()
         hid_device = hid.device()
         hid_device.open_path(device['path'])
+        print(f"Streaming from {self.describe_hid_device(device)}", file=sys.stderr, flush=True)
 
         try:
             while True:
-                encrypted = hid_device.read(self.READ_SIZE)
+                encrypted = hid_device.read(self.READ_SIZE, timeout_ms=1000)
                 normalized = self.normalize_encrypted_packet(encrypted)
                 if normalized is None:
                     packet_len = len(encrypted)
