@@ -76,6 +76,20 @@ and renders two live head maps side by side. Each sensor is colored from
 black/red through green based on the `0..4` quality scale, while each panel also
 shows its overall percentage.
 
+To launch raw EEG, the Cortex quality streams, and the dual quality viewer from a
+single command:
+
+```bash
+python -m pipenv run python main_all.py --client-id YOUR_ID --client-secret YOUR_SECRET
+```
+
+This starts:
+
+* `Epoc X` EEG over the raw HID path
+* `Epoc X Contact Quality` from Cortex `dev`
+* `Epoc X EEG Quality` from Cortex `eq`
+* the live dual-panel viewer
+
 ### Config
 
 Change device sampling rate in config.py and emotiv app

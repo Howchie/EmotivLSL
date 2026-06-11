@@ -1,11 +1,22 @@
 import tkinter as tk
 from dataclasses import dataclass
+from pathlib import Path
 
 from pylsl import StreamInlet, resolve_byprop
 
 
 CQ_STREAM_NAME = "Epoc X Contact Quality"
 EQ_STREAM_NAME = "Epoc X EEG Quality"
+PANEL_IMAGE_CANDIDATES = (
+    Path(__file__).resolve().parents[1] / "head_image.png",
+    Path(__file__).resolve().parents[1] / "example_cq.png",
+)
+PANEL_WIDTH = 462
+PANEL_HEIGHT = 510
+PANEL_GAP = 18
+WINDOW_PADDING = 12
+HEADER_HEIGHT = 34
+STATUS_HEIGHT = 32
 CQ_CHANNEL_ORDER = [
     "Battery",
     "Signal",
@@ -62,20 +73,20 @@ SENSOR_NAMES = [
     "AF4",
 ]
 SENSOR_POSITIONS = {
-    "AF3": (0, -140),
-    "F7": (-58, -102),
-    "F3": (0, -60),
-    "FC5": (-38, -60),
-    "T7": (-95, 5),
-    "P7": (-42, 122),
-    "O1": (2, 206),
-    "O2": (98, 206),
-    "P8": (138, 122),
-    "T8": (190, 5),
-    "FC6": (142, -60),
-    "F4": (95, -60),
-    "F8": (155, -102),
-    "AF4": (98, -140),
+    "AF3": (173, 126),
+    "F7": (119, 143),
+    "FC5": (119, 197),
+    "F3": (173, 198),
+    "T7": (84, 267),
+    "P7": (132, 393),
+    "O1": (175, 460),
+    "O2": (257, 460),
+    "P8": (301, 393),
+    "T8": (347, 267),
+    "FC6": (308, 198),
+    "F4": (259, 197),
+    "F8": (341, 143),
+    "AF4": (258, 126),
 }
 QUALITY_COLORS = {
     0: "#111111",
@@ -127,63 +138,55 @@ class QualityPanel:
         self.sensor_glyphs: dict[str, SensorGlyph] = {}
         self.metric_text_ids: dict[str, int] = {}
         self.overall_text_id: int | None = None
+        self.background_image: tk.PhotoImage | None = None
         self.draw()
 
     def draw(self) -> None:
         self.canvas.create_text(
-            self.x_offset + 150,
-            34,
+            self.x_offset + PANEL_WIDTH // 2,
+            20,
             text=self.title,
             fill="#23374d",
             font=("Helvetica", 16, "bold"),
         )
 
-        self.canvas.create_oval(
-            self.x_offset + 30,
-            60,
-            self.x_offset + 270,
-            405,
-            fill="#dce9fb",
-            outline="#263648",
-            width=3,
-        )
-        self.canvas.create_arc(
-            self.x_offset + 46,
-            86,
-            self.x_offset + 122,
-            250,
-            start=120,
-            extent=135,
-            style=tk.ARC,
-            outline="#263648",
-            width=2,
-        )
-        self.canvas.create_arc(
-            self.x_offset + 180,
-            86,
-            self.x_offset + 256,
-            250,
-            start=-75,
-            extent=135,
-            style=tk.ARC,
-            outline="#263648",
-            width=2,
+        panel_top = HEADER_HEIGHT
+        panel_image_path = next((path for path in PANEL_IMAGE_CANDIDATES if path.exists()), None)
+        if panel_image_path:
+            self.background_image = tk.PhotoImage(file=str(panel_image_path))
+            self.canvas.create_image(self.x_offset, panel_top, image=self.background_image, anchor="nw")
+        else:
+            self.canvas.create_rectangle(
+                self.x_offset,
+                panel_top,
+                self.x_offset + PANEL_WIDTH,
+                panel_top + PANEL_HEIGHT,
+                fill="#dce9fb",
+                outline="#263648",
+                width=2,
+            )
+
+        self.canvas.create_rectangle(
+            self.x_offset + 320,
+            panel_top + 430,
+            self.x_offset + PANEL_WIDTH - 6,
+            panel_top + PANEL_HEIGHT - 6,
+            fill="white",
+            outline="white",
         )
 
-        center_x = self.x_offset + 88
-        center_y = 225
-        for name, (dx, dy) in SENSOR_POSITIONS.items():
-            x = center_x + dx
-            y = center_y + dy
+        for name, (sensor_x, sensor_y) in SENSOR_POSITIONS.items():
+            x = self.x_offset + sensor_x
+            y = panel_top + sensor_y
             ring_id = self.canvas.create_oval(x - 21, y - 21, x + 21, y + 21, fill="#111111", outline="")
             oval_id = self.canvas.create_oval(x - 17, y - 17, x + 17, y + 17, fill=QUALITY_COLORS[0], outline="")
             text_id = self.canvas.create_text(x, y, text=name, fill="white", font=("Helvetica", 10, "bold"))
             self.sensor_glyphs[name] = SensorGlyph(oval_id=oval_id, text_id=text_id, ring_id=ring_id)
 
-        line_y = 445
+        line_y = panel_top + PANEL_HEIGHT + 20
         for key, label in self.left_metric_lines:
             self.metric_text_ids[key] = self.canvas.create_text(
-                self.x_offset + 24,
+                self.x_offset + 16,
                 line_y,
                 text=f"{label}: --",
                 anchor="w",
@@ -193,8 +196,8 @@ class QualityPanel:
             line_y += 26
 
         self.overall_text_id = self.canvas.create_text(
-            self.x_offset + 230,
-            458,
+            self.x_offset + 385,
+            panel_top + 442,
             text="--%",
             fill="#8ad448",
             font=("Helvetica", 28, "bold"),
@@ -223,7 +226,9 @@ class DualQualityViewer:
         self.root.title("Emotiv Contact And EEG Quality")
         self.root.configure(bg="white")
 
-        self.canvas = tk.Canvas(self.root, width=680, height=545, bg="white", highlightthickness=0)
+        canvas_width = (WINDOW_PADDING * 2) + (PANEL_WIDTH * 2) + PANEL_GAP
+        canvas_height = HEADER_HEIGHT + PANEL_HEIGHT + 72
+        self.canvas = tk.Canvas(self.root, width=canvas_width, height=canvas_height, bg="white", highlightthickness=0)
         self.canvas.pack()
 
         self.status_var = tk.StringVar(value="Looking for LSL quality streams...")
@@ -233,7 +238,7 @@ class DualQualityViewer:
         self.cq_panel = QualityPanel(
             canvas=self.canvas,
             title="Contact Quality",
-            x_offset=12,
+            x_offset=WINDOW_PADDING,
             channel_order=CQ_CHANNEL_ORDER,
             overall_key="OVERALL",
             left_metric_lines=[("Battery", "Battery"), ("Signal", "Signal")],
@@ -241,7 +246,7 @@ class DualQualityViewer:
         self.eq_panel = QualityPanel(
             canvas=self.canvas,
             title="EEG Quality",
-            x_offset=344,
+            x_offset=WINDOW_PADDING + PANEL_WIDTH + PANEL_GAP,
             channel_order=EQ_CHANNEL_ORDER,
             overall_key="overall",
             left_metric_lines=[("batteryPercent", "Battery"), ("sampleRateQuality", "Rate")],

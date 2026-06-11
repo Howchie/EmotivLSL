@@ -22,6 +22,18 @@ class StreamSpec:
     lsl_type: str
 
 
+@dataclass
+class BridgeConfig:
+    client_id: str
+    client_secret: str
+    license: str | None = None
+    cortex_url: str = DEFAULT_CORTEX_URL
+    headset_id: str | None = None
+    streams: tuple[str, ...] = DEFAULT_STREAMS
+    verify_ssl: bool = False
+    print_samples: bool = False
+
+
 STREAM_SPECS = {
     "dev": StreamSpec("dev", "Epoc X Contact Quality", "EmotivCQ"),
     "eq": StreamSpec("eq", "Epoc X EEG Quality", "EmotivEQ"),
@@ -142,6 +154,19 @@ def parse_args() -> argparse.Namespace:
     if not args.client_id or not args.client_secret:
         parser.error("client credentials are required via --client-id/--client-secret or EMOTIV_CLIENT_ID/EMOTIV_CLIENT_SECRET")
     return args
+
+
+def config_from_args(args: argparse.Namespace) -> BridgeConfig:
+    return BridgeConfig(
+        client_id=args.client_id,
+        client_secret=args.client_secret,
+        license=args.license,
+        cortex_url=args.cortex_url,
+        headset_id=args.headset_id,
+        streams=tuple(args.streams),
+        verify_ssl=args.verify_ssl,
+        print_samples=args.print_samples,
+    )
 
 
 def ensure_access(client: CortexClient, client_id: str, client_secret: str) -> None:
@@ -275,22 +300,21 @@ def subscribe_streams(client: CortexClient, token: str, session_id: str, streams
     return subscriptions
 
 
-def bridge() -> None:
-    args = parse_args()
-    client = CortexClient(args.cortex_url, verify_ssl=args.verify_ssl)
+def run_bridge(config: BridgeConfig) -> None:
+    client = CortexClient(config.cortex_url, verify_ssl=config.verify_ssl)
     session_id = None
     token = None
 
     try:
         get_logged_in_user(client)
-        ensure_access(client, args.client_id, args.client_secret)
-        token = authorize(client, args.client_id, args.client_secret, args.license)
+        ensure_access(client, config.client_id, config.client_secret)
+        token = authorize(client, config.client_id, config.client_secret, config.license)
 
-        headset = wait_for_connected_headset(client, args.headset_id)
+        headset = wait_for_connected_headset(client, config.headset_id)
         print(f"Using headset {headset['id']}", file=sys.stderr, flush=True)
 
         session_id = open_session(client, token, headset["id"])
-        subscriptions = subscribe_streams(client, token, session_id, args.streams)
+        subscriptions = subscribe_streams(client, token, session_id, list(config.streams))
 
         outlets: dict[str, StreamOutlet] = {}
         for stream_name, labels in subscriptions.items():
@@ -315,7 +339,7 @@ def bridge() -> None:
 
                 values = flatten_values(message[stream_name])
                 outlet.push_sample(values)
-                if args.print_samples:
+                if config.print_samples:
                     print(f"{stream_name}: {values}", file=sys.stderr, flush=True)
 
     except KeyboardInterrupt:
@@ -324,6 +348,10 @@ def bridge() -> None:
         if session_id and token:
             close_session(client, token, session_id)
         client.close()
+
+
+def bridge() -> None:
+    run_bridge(config_from_args(parse_args()))
 
 
 if __name__ == "__main__":
