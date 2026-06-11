@@ -13,8 +13,7 @@ PANEL_IMAGE_CANDIDATES = (
     Path(__file__).resolve().parents[1] / "example_cq.png",
 )
 CALIBRATION_PATH = Path(__file__).resolve().parents[1] / "head_image_coords.json"
-PANEL_WIDTH = 462
-PANEL_HEIGHT = 510
+MAX_PANEL_WIDTH = 420
 PANEL_GAP = 18
 WINDOW_PADDING = 12
 HEADER_HEIGHT = 34
@@ -121,10 +120,10 @@ def pick_panel_image() -> Path:
     raise FileNotFoundError("No panel image found. Expected head_image.png or example_cq.png in the repo root.")
 
 
-def scale_point(panel_left: int, panel_top: int, norm_x: float, norm_y: float) -> tuple[float, float]:
+def scale_point(panel_left: int, panel_top: int, panel_width: int, panel_height: int, norm_x: float, norm_y: float) -> tuple[float, float]:
     return (
-        panel_left + (norm_x * PANEL_WIDTH),
-        panel_top + (norm_y * PANEL_HEIGHT),
+        panel_left + (norm_x * panel_width),
+        panel_top + (norm_y * panel_height),
     )
 
 
@@ -138,6 +137,8 @@ class QualityPanel:
         metric_labels: list[tuple[str, str]],
         calibration: dict,
         panel_image: tk.PhotoImage,
+        panel_width: int,
+        panel_height: int,
     ) -> None:
         self.canvas = canvas
         self.title = title
@@ -147,6 +148,8 @@ class QualityPanel:
         self.metric_labels = metric_labels
         self.calibration = calibration
         self.panel_image = panel_image
+        self.panel_width = panel_width
+        self.panel_height = panel_height
         self.sensor_glyphs: dict[str, SensorGlyph] = {}
         self.metric_text_ids: dict[str, int] = {}
         self.overall_text_id: int | None = None
@@ -155,7 +158,7 @@ class QualityPanel:
 
     def draw(self) -> None:
         self.canvas.create_text(
-            self.panel_left + PANEL_WIDTH / 2,
+            self.panel_left + self.panel_width / 2,
             20,
             text=self.title,
             fill="#23374d",
@@ -165,7 +168,7 @@ class QualityPanel:
 
         for sensor_name in SENSOR_NAMES:
             norm_x, norm_y = self.calibration["sensors"][sensor_name]
-            x, y = scale_point(self.panel_left, self.panel_top, norm_x, norm_y)
+            x, y = scale_point(self.panel_left, self.panel_top, self.panel_width, self.panel_height, norm_x, norm_y)
             ring_id = self.canvas.create_oval(
                 x - RING_RADIUS, y - RING_RADIUS, x + RING_RADIUS, y + RING_RADIUS, fill="#111111", outline=""
             )
@@ -175,7 +178,7 @@ class QualityPanel:
             text_id = self.canvas.create_text(x, y, text=sensor_name, fill="white", font=("Helvetica", 10, "bold"))
             self.sensor_glyphs[sensor_name] = SensorGlyph(oval_id=oval_id, text_id=text_id, ring_id=ring_id)
 
-        line_y = self.panel_top + PANEL_HEIGHT + 20
+        line_y = self.panel_top + self.panel_height + 20
         for key, label in self.metric_labels:
             self.metric_text_ids[key] = self.canvas.create_text(
                 self.panel_left + 16,
@@ -188,7 +191,9 @@ class QualityPanel:
             line_y += 26
 
         overall_x, overall_y = self.calibration["overall_anchor"]
-        overall_fill_x, overall_fill_y = scale_point(self.panel_left, self.panel_top, overall_x, overall_y)
+        overall_fill_x, overall_fill_y = scale_point(
+            self.panel_left, self.panel_top, self.panel_width, self.panel_height, overall_x, overall_y
+        )
         self.overall_background_id = self.canvas.create_rectangle(
             overall_fill_x - 52,
             overall_fill_y - 24,
@@ -239,10 +244,14 @@ class DualQualityViewer:
         self.root = tk.Tk()
         self.root.title("Emotiv Contact And EEG Quality")
         self.root.configure(bg="white")
-        self.panel_image = tk.PhotoImage(file=str(pick_panel_image()))
+        source_image = tk.PhotoImage(file=str(pick_panel_image()))
+        subsample_factor = max(1, (source_image.width() + MAX_PANEL_WIDTH - 1) // MAX_PANEL_WIDTH)
+        self.panel_image = source_image.subsample(subsample_factor, subsample_factor)
+        self.panel_width = self.panel_image.width()
+        self.panel_height = self.panel_image.height()
 
-        canvas_width = (WINDOW_PADDING * 2) + (PANEL_WIDTH * 2) + PANEL_GAP
-        canvas_height = HEADER_HEIGHT + PANEL_HEIGHT + 72
+        canvas_width = (WINDOW_PADDING * 2) + (self.panel_width * 2) + PANEL_GAP
+        canvas_height = HEADER_HEIGHT + self.panel_height + 72
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         viewport_width = min(canvas_width, max(640, screen_width - 120))
@@ -282,15 +291,19 @@ class DualQualityViewer:
             metric_labels=[("Battery", "Battery"), ("Signal", "Signal")],
             calibration=self.calibration,
             panel_image=self.panel_image,
+            panel_width=self.panel_width,
+            panel_height=self.panel_height,
         )
         self.eq_panel = QualityPanel(
             canvas=self.canvas,
             title="EEG Quality",
-            panel_left=WINDOW_PADDING + PANEL_WIDTH + PANEL_GAP,
+            panel_left=WINDOW_PADDING + self.panel_width + PANEL_GAP,
             channel_order=EQ_CHANNEL_ORDER,
             metric_labels=[("batteryPercent", "Battery"), ("sampleRateQuality", "Rate")],
             calibration=self.calibration,
             panel_image=self.panel_image,
+            panel_width=self.panel_width,
+            panel_height=self.panel_height,
         )
 
         self.cq_inlet: StreamInlet | None = None
