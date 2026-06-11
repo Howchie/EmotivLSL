@@ -3,7 +3,7 @@ from datetime import datetime
 import numpy as np
 from mne import Info, create_info
 from mne.io.array import RawArray
-from pylsl import StreamInlet, resolve_stream
+from pylsl import StreamInlet, resolve_byprop
 
 from config import SRATE
 
@@ -24,7 +24,7 @@ def get_info() -> Info:
 def main():
     # first resolve an EEG stream on the lab network
     print("looking for an EEG stream...")
-    streams = resolve_stream('type', 'EEG')
+    streams = resolve_byprop('type', 'EEG')
 
     # create a new inlet to read from the stream
     inlet = StreamInlet(streams[0])

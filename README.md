@@ -33,6 +33,38 @@ Or use examples/read_data.py to get raw data
 python -m pipenv run python examples/read_data.py
 ```
 
+### Cortex quality streams to LSL
+
+If you have a working Cortex app key, this repo can also bridge the Cortex `dev`
+(contact quality) and `eq` (EEG quality) streams into LSL without changing the
+raw HID EEG path.
+
+Set your Cortex credentials:
+
+```bash
+export EMOTIV_CLIENT_ID=your_client_id
+export EMOTIV_CLIENT_SECRET=your_client_secret
+```
+
+Then run:
+
+```bash
+python -m pipenv run python main_cortex.py --print-samples
+```
+
+This opens two additional LSL outlets when Cortex allows them:
+
+* `Epoc X Contact Quality`
+* `Epoc X EEG Quality`
+
+Notes:
+
+* You must be logged into EMOTIV Launcher on the same machine.
+* The app must be approved in EMOTIV Launcher.
+* This bridge uses Cortex over `wss://localhost:6868`.
+* It opens a Cortex session in `open` mode, not `active`, because the goal here
+  is to test `dev` and `eq`, not licensed raw EEG via Cortex.
+
 ### Config
 
 Change device sampling rate in config.py and emotiv app
