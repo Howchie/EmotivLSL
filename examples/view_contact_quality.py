@@ -235,11 +235,11 @@ class QualityPanel:
 class DualQualityViewer:
     def __init__(self) -> None:
         self.calibration = load_calibration()
-        self.panel_image = tk.PhotoImage(file=str(pick_panel_image()))
 
         self.root = tk.Tk()
         self.root.title("Emotiv Contact And EEG Quality")
         self.root.configure(bg="white")
+        self.panel_image = tk.PhotoImage(file=str(pick_panel_image()))
 
         canvas_width = (WINDOW_PADDING * 2) + (PANEL_WIDTH * 2) + PANEL_GAP
         canvas_height = HEADER_HEIGHT + PANEL_HEIGHT + 72
