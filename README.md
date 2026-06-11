@@ -65,6 +65,17 @@ Notes:
 * It opens a Cortex session in `open` mode, not `active`, because the goal here
   is to test `dev` and `eq`, not licensed raw EEG via Cortex.
 
+To view the contact quality stream as a live head map:
+
+```bash
+python -m pipenv run python examples/view_contact_quality.py
+```
+
+This viewer subscribes to both `Epoc X Contact Quality` and `Epoc X EEG Quality`
+and renders two live head maps side by side. Each sensor is colored from
+black/red through green based on the `0..4` quality scale, while each panel also
+shows its overall percentage.
+
 ### Config
 
 Change device sampling rate in config.py and emotiv app
