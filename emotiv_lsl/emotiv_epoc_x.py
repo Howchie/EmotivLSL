@@ -1,5 +1,6 @@
 import csv
 from pathlib import Path
+import sys
 
 import hid
 from Crypto.Cipher import AES
@@ -11,6 +12,7 @@ from config import SRATE
 
 class EmotivEpocX(EmotivBase):
     READ_SIZE = 32
+    LOG_FLUSH_INTERVAL = 256
 
     CH_NAMES = ['AF3', 'F7', 'F3', 'FC5', 'T7', 'P7',
                 'O1', 'O2', 'P8', 'T8', 'FC6', 'F4', 'F8', 'AF4']
@@ -69,6 +71,13 @@ class EmotivEpocX(EmotivBase):
         data = [el ^ 0x55 for el in data]
         return self.cipher.decrypt(bytearray(data))
 
+    def normalize_encrypted_packet(self, data) -> list[int] | None:
+        if len(data) == self.READ_SIZE:
+            return data
+        if len(data) == self.READ_SIZE + 1 and data[0] == 0:
+            return data[1:]
+        return None
+
     def decode_data(self, data) -> list:
         data = self.decrypt_data(data)
         return self.decode_eeg_sample(data)
@@ -118,11 +127,15 @@ class EmotivEpocX(EmotivBase):
 
         log_handle = None
         log_writer = None
+        logged_packets = 0
+        warned_lengths = set()
         if self.packet_log_path:
             self.packet_log_path.parent.mkdir(parents=True, exist_ok=True)
             log_handle = self.packet_log_path.open('w', newline='')
             log_writer = csv.writer(log_handle)
             log_writer.writerow([f'byte_{i}' for i in range(self.READ_SIZE)])
+            log_handle.flush()
+            print(f"Logging decrypted packets to {self.packet_log_path.resolve()}", file=sys.stderr, flush=True)
 
         device = self.get_hid_device()
         hid_device = hid.device()
@@ -131,19 +144,35 @@ class EmotivEpocX(EmotivBase):
         try:
             while True:
                 encrypted = hid_device.read(self.READ_SIZE)
-                if not self.validate_data(encrypted):
+                normalized = self.normalize_encrypted_packet(encrypted)
+                if normalized is None:
+                    packet_len = len(encrypted)
+                    if packet_len not in warned_lengths:
+                        print(
+                            f"Skipping HID packet with length {packet_len}; expected 32 bytes"
+                            " or 33 with a leading report ID byte.",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        warned_lengths.add(packet_len)
                     continue
 
-                decrypted = self.decrypt_data(encrypted)
+                decrypted = self.decrypt_data(normalized)
                 eeg_outlet.push_sample(self.decode_eeg_sample(decrypted))
 
                 if debug_outlet:
                     debug_outlet.push_sample(self.decode_debug_sample(decrypted))
                 if log_writer:
                     self.log_decrypted_packet(log_writer, decrypted)
+                    logged_packets += 1
+                    if logged_packets == 1:
+                        print("Received first valid decrypted packet.", file=sys.stderr, flush=True)
+                    if logged_packets % self.LOG_FLUSH_INTERVAL == 0:
+                        log_handle.flush()
         finally:
             hid_device.close()
             if log_handle:
+                log_handle.flush()
                 log_handle.close()
 
     def convertEPOC_PLUS(self, value_1, value_2):
