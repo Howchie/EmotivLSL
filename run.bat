@@ -1,0 +1,1 @@
+python -m pipenv run python main_cortex.py --client-id mJpALzbxF3J6eAbiz9GPNnmJOkTz7f7COgBnFgLh --client-secret tVhpfg716GTkH0dhkBr0rznta0Su8QGwYKohxDO9F7Ya2FmS3hkJFOHXesuMjXCc59zIeXp2ARl1D9eF4aoSzt25jy1AUZftsri07VkEHCp2HX6WkalQ2cdBWv578TVB
