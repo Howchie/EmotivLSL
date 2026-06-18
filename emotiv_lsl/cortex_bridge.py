@@ -136,8 +136,8 @@ def create_outlet(spec: StreamSpec, labels: list[str]) -> StreamOutlet:
 def convert_sample(values: list, channel_format: str) -> list:
     flattened = flatten_values(values)
     if channel_format == "string":
-        return [str(value) for value in flattened]
-    return [float(value) for value in flattened]
+        return ["" if value is None else str(value) for value in flattened]
+    return [float("nan") if value is None else float(value) for value in flattened]
 
 
 def parse_args() -> argparse.Namespace:
