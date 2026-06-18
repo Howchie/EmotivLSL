@@ -57,6 +57,32 @@ This opens two additional LSL outlets when Cortex allows them:
 * `Epoc X Contact Quality`
 * `Epoc X EEG Quality`
 
+You can also enable additional non-motion Cortex streams such as:
+
+* `pow` -> `Epoc X Band Power`
+* `met` -> `Epoc X Performance Metrics`
+* `com` -> `Epoc X Mental Commands`
+* `fac` -> `Epoc X Facial Expressions`
+
+Their Cortex sample rates differ:
+
+* `dev`: 2 Hz
+* `eq`: 2 Hz
+* `pow`: 8 Hz
+* `met`: variable, typically 2 Hz with the right scope/session state, otherwise as low as 0.1 Hz
+* `com`: 8 Hz
+* `fac`: 32 Hz
+
+The bridge now republishes Cortex samples to LSL using the original Cortex sample
+timestamps converted into the local LSL clock domain, so cross-stream alignment
+does not rely on arrival timing alone.
+
+Example:
+
+```bash
+python -m pipenv run python main_cortex.py --streams dev eq pow met com fac
+```
+
 Notes:
 
 * You must be logged into EMOTIV Launcher on the same machine.
@@ -93,6 +119,12 @@ single command:
 
 ```bash
 python -m pipenv run python main_all.py --client-id YOUR_ID --client-secret YOUR_SECRET
+```
+
+To include the additional optional Cortex streams in the unified launcher:
+
+```bash
+python -m pipenv run python main_all.py --client-id YOUR_ID --client-secret YOUR_SECRET --streams dev eq pow met com fac
 ```
 
 This starts:

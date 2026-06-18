@@ -6,7 +6,7 @@ import sys
 import time
 from dataclasses import dataclass
 
-from pylsl import StreamInfo, StreamOutlet
+from pylsl import StreamInfo, StreamOutlet, local_clock
 from websocket import WebSocketTimeoutException, create_connection
 
 
@@ -20,6 +20,8 @@ class StreamSpec:
     cortex_name: str
     lsl_name: str
     lsl_type: str
+    channel_format: str
+    nominal_srate: float
 
 
 @dataclass
@@ -35,8 +37,12 @@ class BridgeConfig:
 
 
 STREAM_SPECS = {
-    "dev": StreamSpec("dev", "Epoc X Contact Quality", "EmotivCQ"),
-    "eq": StreamSpec("eq", "Epoc X EEG Quality", "EmotivEQ"),
+    "dev": StreamSpec("dev", "Epoc X Contact Quality", "EmotivCQ", "float32", 2),
+    "eq": StreamSpec("eq", "Epoc X EEG Quality", "EmotivEQ", "float32", 2),
+    "pow": StreamSpec("pow", "Epoc X Band Power", "EmotivPow", "float32", 8),
+    "met": StreamSpec("met", "Epoc X Performance Metrics", "EmotivMet", "float32", 0),
+    "com": StreamSpec("com", "Epoc X Mental Commands", "EmotivCom", "string", 8),
+    "fac": StreamSpec("fac", "Epoc X Facial Expressions", "EmotivFac", "string", 32),
 }
 
 
@@ -89,13 +95,13 @@ def add_channel_metadata(info: StreamInfo, labels: list[str]) -> None:
             for part in label:
                 ch = chns.append_child("channel")
                 ch.append_child_value("label", str(part))
-                ch.append_child_value("type", "Quality")
+                ch.append_child_value("type", "Cortex")
                 ch.append_child_value("unit", "score")
             continue
 
         ch = chns.append_child("channel")
         ch.append_child_value("label", str(label))
-        ch.append_child_value("type", "Quality")
+        ch.append_child_value("type", "Cortex")
         ch.append_child_value("unit", "score")
 
 
@@ -109,21 +115,29 @@ def flatten_labels(labels: list) -> list[str]:
     return flattened
 
 
-def flatten_values(values: list) -> list[float]:
-    flattened: list[float] = []
+def flatten_values(values: list) -> list:
+    flattened: list = []
     for value in values:
         if isinstance(value, list):
-            flattened.extend(float(part) for part in value)
+            flattened.extend(part for part in value)
         else:
-            flattened.append(float(value))
+            flattened.append(value)
     return flattened
 
 
-def create_outlet(stream_name: str, labels: list[str], lsl_name: str, lsl_type: str) -> StreamOutlet:
-    info = StreamInfo(lsl_name, lsl_type, len(flatten_labels(labels)), 2, "float32")
-    info.desc().append_child_value("source_stream", stream_name)
+def create_outlet(spec: StreamSpec, labels: list[str]) -> StreamOutlet:
+    info = StreamInfo(spec.lsl_name, spec.lsl_type, len(flatten_labels(labels)), spec.nominal_srate, spec.channel_format)
+    info.desc().append_child_value("source_stream", spec.cortex_name)
+    info.desc().append_child_value("cortex_nominal_srate_hz", str(spec.nominal_srate))
     add_channel_metadata(info, labels)
     return StreamOutlet(info)
+
+
+def convert_sample(values: list, channel_format: str) -> list:
+    flattened = flatten_values(values)
+    if channel_format == "string":
+        return [str(value) for value in flattened]
+    return [float(value) for value in flattened]
 
 
 def parse_args() -> argparse.Namespace:
@@ -304,6 +318,8 @@ def run_bridge(config: BridgeConfig) -> None:
     client = CortexClient(config.cortex_url, verify_ssl=config.verify_ssl)
     session_id = None
     token = None
+    # Cortex timestamps are Unix epoch seconds; LSL expects local_clock() timebase.
+    cortex_to_lsl_offset = local_clock() - time.time()
 
     try:
         get_logged_in_user(client)
@@ -319,7 +335,7 @@ def run_bridge(config: BridgeConfig) -> None:
         outlets: dict[str, StreamOutlet] = {}
         for stream_name, labels in subscriptions.items():
             spec = STREAM_SPECS[stream_name]
-            outlets[stream_name] = create_outlet(stream_name, labels, spec.lsl_name, spec.lsl_type)
+            outlets[stream_name] = create_outlet(spec, labels)
             print(
                 f"Publishing {stream_name} as LSL '{spec.lsl_name}' with columns {labels!r}",
                 file=sys.stderr,
@@ -337,8 +353,13 @@ def run_bridge(config: BridgeConfig) -> None:
                 if stream_name not in message:
                     continue
 
-                values = flatten_values(message[stream_name])
-                outlet.push_sample(values)
+                values = convert_sample(message[stream_name], STREAM_SPECS[stream_name].channel_format)
+                sample_timestamp = message.get("time")
+                lsl_timestamp = sample_timestamp + cortex_to_lsl_offset if sample_timestamp is not None else None
+                if lsl_timestamp is None:
+                    outlet.push_sample(values)
+                else:
+                    outlet.push_sample(values, timestamp=lsl_timestamp)
                 if config.print_samples:
                     print(f"{stream_name}: {values}", file=sys.stderr, flush=True)
 

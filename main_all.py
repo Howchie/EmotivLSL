@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--streams",
         nargs="+",
-        choices=["dev", "eq"],
+        choices=["dev", "eq", "pow", "met", "com", "fac"],
         default=["dev", "eq"],
         help="Cortex quality streams to bridge to LSL",
     )
