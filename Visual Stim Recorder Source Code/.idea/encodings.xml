@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/._README.md" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/app/._proguard-rules.pro" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/app/src/main/cpp/._CMakeLists.txt" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/app/src/main/cpp/._native-lib.cpp" charset="ISO-8859-1" />
+  </component>
+</project>
