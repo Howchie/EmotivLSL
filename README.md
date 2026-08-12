@@ -5,14 +5,25 @@ Original code taken from [CyKit](https://github.com/CymatiCorp/CyKit)
 
 ### Dependencies
 
+On Windows, install Python 3.11 or newer, then double-click `run.bat`. The
+launcher installs Pipenv (if needed), creates the environment, and installs the
+exact versions from `Pipfile.lock` before starting the LSL streams. The first
+run requires an internet connection; later runs reuse the environment.
+
+For manual setup or non-Windows use:
+
 ```
 pip install pipenv
-python -m pipenv install
+python -m pipenv sync --dev
 ```
 
 ### Usage
 Disable the motion data in Emotiv app settings  
 Connect dongle, turn on the headset, wait for the light from two indicators
+
+On Windows, `run.bat` launches the EEG and Cortex LSL streams with the
+repository's configured developer credentials and `dev eq pow` streams.
+
 ```
 # frist terminal
 python -m pipenv run python main.py
