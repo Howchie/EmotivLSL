@@ -94,12 +94,13 @@ Example:
 python -m pipenv run python main_cortex.py --streams dev eq pow met com fac
 ```
 
-### Firmware 0x740 raw EEG fallback
+### Firmware 0x740 raw EEG support
 
-EPOC X firmware `0x740` uses an encryption protocol that the legacy direct-HID
-decoder in this repository does not yet understand. Cortex performs that
-firmware-specific decryption for us, so a licensed Cortex application can
-publish the raw EEG stream directly:
+EPOC X firmware `0x740` uses a different HID encryption protocol from older
+firmware. The direct-HID reader now queries the EEG collection's feature report,
+derives the firmware-specific AES-256 key, and publishes the raw EEG stream
+without a Cortex EEG license. A licensed Cortex application remains an
+alternative:
 
 ```bash
 python -m pipenv run python main_cortex.py --streams eeg
@@ -116,33 +117,47 @@ activated session. The existing default `dev eq` bridge remains unactivated and
 continues to work for quality-only access. EmotivPRO's integrated LSL EEG outlet
 is another supported fallback when EmotivPRO is licensed.
 
-### Capture a firmware-740 startup handshake
+### Inspect a firmware-740 HID feature report
 
-The direct HID decoder needs one control report that is sent during connection;
-the steady-state 32-byte EEG dump in issue #17 does not include it. To capture
-that report, insert the dongle, leave the headset powered off, and run the
-recorder before powering on the headset. It is fine to leave EMOTIV Launcher
-running if the Cortex service needs it; the recorder talks to HID directly and
-does not use Cortex login.
+The direct HID decoder can query the feature report after opening the EEG
+collection; the steady-state 32-byte EEG dump in issue #17 does not contain the
+firmware seed by itself. To inspect the exchange, insert the dongle, leave the
+headset powered off, and run the recorder before powering on the headset. It is
+fine to leave EMOTIV Launcher running if the Cortex service needs it; the
+recorder talks to HID directly and does not use Cortex login.
 
 ```bash
-python -m pipenv run python examples/capture_hid_startup.py --seconds 20
+python -m pipenv run python examples/capture_hid_startup.py --seconds 60 >hid_capture.log 2>&1
 ```
 
 Start the recorder first, then power on the headset and leave it running for a
 few seconds. It records both Emotiv HID interfaces and preserves the raw report
 length and bytes in `data/epocx_startup_hid.csv`; serial numbers can be redacted
-afterward, but do not alter the report bytes. That capture is the missing input
-needed to validate and finish the no-license firmware-740 decoder.
+afterward, but do not alter the report bytes. A USBPcap trace is needed only if
+the feature report itself must be inspected; the launcher now performs the
+feature query automatically.
 
-The complete reverse-engineered design, including the firmware gate, startup
-seed, SHA-256/AES-256 derivation, and downgrade findings, is preserved in
+Because the Cortex service may initiate the headset session, keep EMOTIV
+Launcher running for this capture and allow it to notice/connect the headset
+after the recorder has started. The hidapi CSV may contain only steady-state
+`usage=2` rows; the feature report is a separate control transfer.
+
+The recorder writes diagnostics to stderr, so redirect both streams (`>file
+2>&1`) if you want the console output saved. If both interfaces report
+`Capturing` but the CSV still contains only `usage=2` input reports, that is
+normal: the feature query is a control transfer and is not emitted as an input
+row. A USBPcap/Wireshark capture of the dongle records both directions if
+further protocol inspection is needed.
+
+The complete reverse-engineered design, including the firmware gate,
+feature-report seed, SHA-256/AES-256 derivation, and downgrade findings, is
+preserved in
 [`docs/firmware_0740_hid_path.md`](docs/firmware_0740_hid_path.md).
 
-The capture script is not part of the eventual acquisition workflow. Once the
-decoder is finished, it will collect and cache the handshake automatically on
-each headset connection while the Cortex service remains running for the
-quality streams; no Cortex `eeg` scope is involved.
+The capture script is not part of the eventual acquisition workflow. The
+decoder collects and caches the feature-report key automatically on each
+headset connection while the Cortex service remains running for the quality
+streams; no Cortex `eeg` scope is involved.
 
 Notes:
 
@@ -151,8 +166,9 @@ Notes:
 * Do not start a second copy of this repository's launcher or EmotivPRO's EEG
   stream during capture. EMOTIV Launcher itself may remain running for the
   Cortex service.
-* If the headset was already on, turn it off after starting the recorder and
-  power it on again; the connection-time report is the important one.
+* For a complete USBPcap startup trace, turn the headset off after starting the
+  capture and power it on again. The production decoder can query the feature
+  report even when the headset is already connected.
 
 The separate Cortex bridge uses `wss://localhost:6868`; quality-only runs
 (`dev`, `eq`, etc.) use an unactivated `open` session, while a run that includes

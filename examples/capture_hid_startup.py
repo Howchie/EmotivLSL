@@ -15,14 +15,26 @@ import time
 import hid
 
 
-POLL_SECONDS = 0.25
+# Short enough to attach promptly when Windows creates the composite HID
+# interfaces after the headset powers on, while avoiding a tight enumeration
+# loop.
+POLL_SECONDS = 0.05
 READ_SIZE = 64
 READ_TIMEOUT_MS = 500
+EMOTIV_VENDOR_ID = 0x1234
+EMOTIV_PRODUCT_ID = 0xED02
 
 
 def is_emotiv(device: dict) -> bool:
     manufacturer = device.get("manufacturer_string")
-    return isinstance(manufacturer, str) and manufacturer.casefold() == "emotiv"
+    if isinstance(manufacturer, str) and manufacturer.casefold() == "emotiv":
+        return True
+    # Some Windows HID enumeration paths omit the manufacturer string.  The
+    # EPOC X receiver and EEG interfaces share this VID/PID pair.
+    return (
+        device.get("vendor_id") == EMOTIV_VENDOR_ID
+        and device.get("product_id") == EMOTIV_PRODUCT_ID
+    )
 
 
 def device_description(device: dict) -> str:
@@ -139,6 +151,8 @@ def main() -> None:
                     continue
                 if worker:
                     workers.pop(path_key, None)
+
+                print(f"Found Emotiv HID {device_description(device)}", file=sys.stderr, flush=True)
 
                 thread = threading.Thread(
                     target=capture_device,

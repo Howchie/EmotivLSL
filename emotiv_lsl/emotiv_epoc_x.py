@@ -1,4 +1,5 @@
 import csv
+import hashlib
 from pathlib import Path
 import sys
 
@@ -12,6 +13,11 @@ from config import SRATE
 
 class EmotivEpocX(EmotivBase):
     READ_SIZE = 32
+    FEATURE_REPORT_LENGTH = 32
+    LEGACY_PACKET_XOR = 0x55
+    FW740_PACKET_XOR = 0x14
+    FW740_MIN_VERSION = 0x73F
+    FW740_FEATURE_MARKER = b'\x06\xff'
     LOG_FLUSH_INTERVAL = 256
     PROBE_READ_ATTEMPTS = 8
     PROBE_TIMEOUT_MS = 250
@@ -24,7 +30,12 @@ class EmotivEpocX(EmotivBase):
         self.emit_debug = emit_debug
         self.packet_log_path = Path(packet_log_path) if packet_log_path else None
 
-        self.cipher = AES.new(self.get_crypto_key(), AES.MODE_ECB)
+        # The legacy serial-derived key is not valid on firmware 0x740.  The
+        # actual cipher is selected after the streaming HID collection is open,
+        # when its feature report can be queried.
+        self.packet_xor = self.LEGACY_PACKET_XOR
+        self.cipher = None
+        self.firmware_version = None
 
     def get_hid_devices(self) -> list[dict]:
         devices = []
@@ -62,13 +73,85 @@ class EmotivEpocX(EmotivBase):
 
         raise Exception('Emotiv Epoc X not found')
 
-    def get_crypto_key(self) -> bytearray:
-        serial = self.get_hid_device()['serial_number']
+    def get_crypto_key(self, device: dict | None = None) -> bytearray:
+        if device is None:
+            device = self.get_hid_device()
+        serial = device['serial_number']
         sn = bytearray()
         for i in range(0, len(serial)):
             sn += bytearray([ord(serial[i])])
 
         return bytearray([sn[-1], sn[-2], sn[-4], sn[-4], sn[-2], sn[-1], sn[-2], sn[-4], sn[-1], sn[-4], sn[-3], sn[-2], sn[-1], sn[-2], sn[-2], sn[-3]])
+
+    @classmethod
+    def parse_firmware_feature_report(cls, report) -> tuple[int, bytes] | None:
+        """Extract the firmware version and session seed from a feature report.
+
+        The firmware-0x740 report observed on the EPOC X collection is:
+
+            20 30 06 ff 07 40 e5 02 01 ce ...
+
+        The marker is followed by a big-endian firmware number and four seed
+        bytes.  Scanning for the marker tolerates HID backends that prepend a
+        report-ID byte to the returned buffer.
+        """
+        data = bytes(report)
+        marker = cls.FW740_FEATURE_MARKER
+        for offset in range(0, len(data) - 7):
+            if data[offset:offset + len(marker)] != marker:
+                continue
+            firmware = int.from_bytes(data[offset + 2:offset + 4], 'big')
+            seed = data[offset + 4:offset + 8]
+            if len(seed) == 4:
+                return firmware, seed
+        return None
+
+    @staticmethod
+    def get_firmware_crypto_key(seed: bytes, firmware: int) -> bytes:
+        seed_hex = bytes(seed).hex().upper()
+        key_material = (
+            b'Vohcha7e' + seed_hex[:4].encode('ascii') +
+            b'Ut3phaej' + seed_hex[4:8].encode('ascii') +
+            f'{firmware:04X}'.encode('ascii')
+        )
+        return hashlib.sha256(key_material).digest()
+
+    def configure_cipher(self, hid_device, device: dict) -> None:
+        """Select the legacy or firmware-aware cipher for one HID session."""
+        feature_report = None
+        try:
+            feature_report = hid_device.get_feature_report(0, self.FEATURE_REPORT_LENGTH)
+        except Exception as exc:
+            print(
+                f'Could not query the EPOC X feature report ({exc}); '
+                'falling back to the legacy HID key.',
+                file=sys.stderr,
+                flush=True,
+            )
+
+        parsed = self.parse_firmware_feature_report(feature_report or [])
+        if parsed is not None:
+            firmware, seed = parsed
+            self.firmware_version = firmware
+            if firmware >= self.FW740_MIN_VERSION:
+                self.packet_xor = self.FW740_PACKET_XOR
+                self.cipher = AES.new(
+                    self.get_firmware_crypto_key(seed, firmware),
+                    AES.MODE_ECB,
+                )
+                print(
+                    f'Using firmware-aware EPOC X HID decryption for '
+                    f'firmware 0x{firmware:03x}.',
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return
+
+        self.packet_xor = self.LEGACY_PACKET_XOR
+        self.cipher = AES.new(self.get_crypto_key(device), AES.MODE_ECB)
+        if self.firmware_version is None:
+            self.firmware_version = 0
+        print('Using legacy EPOC X HID decryption.', file=sys.stderr, flush=True)
 
     def get_stream_info(self) -> StreamInfo:
         n_channels = len(self.CH_NAMES)
@@ -99,7 +182,9 @@ class EmotivEpocX(EmotivBase):
         return info
 
     def decrypt_data(self, data) -> bytearray:
-        data = [el ^ 0x55 for el in data]
+        if self.cipher is None:
+            raise RuntimeError('HID cipher has not been configured')
+        data = [el ^ self.packet_xor for el in data]
         return self.cipher.decrypt(bytearray(data))
 
     def normalize_encrypted_packet(self, data) -> list[int] | None:
@@ -217,6 +302,7 @@ class EmotivEpocX(EmotivBase):
         device = self.get_streaming_hid_device_info()
         hid_device = hid.device()
         hid_device.open_path(device['path'])
+        self.configure_cipher(hid_device, device)
         print(f"Streaming from {self.describe_hid_device(device)}", file=sys.stderr, flush=True)
 
         try:

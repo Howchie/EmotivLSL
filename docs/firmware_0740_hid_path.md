@@ -25,17 +25,27 @@ sample layout.
 
 ## Intended firmware-740 decoder
 
-The current service uses a connection-time type-7 control packet to establish a
-per-session key. The packet is not present in the 200 steady-state EEG reports
-attached to issue #17, which is why those reports cannot be decoded by
-themselves.
+The successful USBPcap trace shows that the key material is available through a
+HID feature report on the `EEG Signals` collection. The relevant control
+transaction is a `GET_REPORT` (feature, report ID 0) on interface 1. In the
+capture, the returned bytes were:
+
+```text
+20 30 06 ff 07 40 e5 02 01 ce 2b 01 00 01 10 00 10
+```
+
+The `06 ff` marker is followed by the big-endian firmware number (`07 40` =
+`0x740`) and the four-byte session seed (`e5 02 01 ce`). This is preferable to
+waiting for a transient input packet: a reader can query the feature report
+after opening the HID collection, including when Launcher has already connected
+the headset.
 
 The reverse-engineered path is:
 
-1. Observe the type-7 startup/control report on the HID connection. Cortex
-   parses its hex payload; the first four decoded payload bytes are the session
-   seed.
-2. Format those four bytes as eight uppercase hexadecimal characters and build
+1. Query feature report ID 0 on the `EEG Signals` HID collection and locate the
+   `06 ff` marker. Read the next two bytes as the firmware number and the next
+   four bytes as the session seed.
+2. Format the four seed bytes as eight uppercase hexadecimal characters and build
    this ASCII key material (where `FW` is four uppercase hex digits, e.g.
    `0740`):
 
@@ -54,7 +64,10 @@ The reverse-engineered path is:
 Pseudocode:
 
 ```python
-seed_hex = control_payload[:4].hex().upper()
+feature = bytes.fromhex("203006ff0740e50201ce2b010001100010")
+offset = feature.index(b"\x06\xff")
+firmware = int.from_bytes(feature[offset + 2:offset + 4], "big")
+seed_hex = feature[offset + 4:offset + 8].hex().upper()
 key_material = (
     b"Vohcha7e" + seed_hex[:4].encode("ascii") +
     b"Ut3phaej" + seed_hex[4:8].encode("ascii") +
@@ -66,58 +79,67 @@ plain = AES.new(aes_key, AES.MODE_ECB).decrypt(
 )
 ```
 
-The seed extraction and report framing still need to be validated against a
-real power-on capture. Do not replace the old decoder globally until that test
-passes; the launcher may need to select the old or new path by firmware.
+This path was validated against the supplied `data/capture.pcap` trace: the
+derived key produces correctly varying channel values and the decrypted packet
+counter advances through 5,188 captured EEG reports (including the initial
+baseline period). The implementation now
+selects this path automatically for feature-report firmware `>= 0x73f` and
+retains the serial-derived AES-128 path for older firmware.
 
 ## Runtime relationship with Cortex quality streams
 
-The standalone capture script is only a reverse-engineering tool. The finished
-launcher will not require the user to run it on every acquisition. The HID
-reader will watch for the type-7 control report when the headset connects,
-derive the key, and retain that key for the current headset connection. A new
-headset power cycle or reconnect is expected to establish a new session key;
-the reader should therefore remain open across normal operation and reconnect
-handling should repeat the same handshake step.
+The standalone capture script is only a reverse-engineering tool. The launcher
+queries the feature report after opening the HID collection, derives the key,
+and retains it for the current headset connection. A new headset power cycle or
+reconnect should repeat the feature query so any new seed is picked up.
 
-This can run alongside the existing Cortex quality path. Leave EMOTIV Launcher
-and the Cortex service running for `dev`/`eq`; the direct HID reader does not
-need Cortex's `eeg` scope and does not replace the quality subscriptions. The
-only startup-order constraint is that the HID reader must be attached before a
-new connection's control report is emitted. If a reader is restarted after the
-headset is already connected and has missed that report, it should request a
-reconnect/power cycle (or use a cached key) rather than attempting to decrypt
-the EEG stream with the legacy key.
+This runs alongside the existing Cortex quality path. Leave EMOTIV Launcher and
+the Cortex service running for `dev`/`eq`; the direct HID reader does not need
+Cortex's `eeg` scope and does not replace the quality subscriptions. There is no
+startup race with a one-shot input packet: the feature report can be queried
+after the headset is already connected. If the feature query fails, the reader
+falls back to the legacy path for compatibility with older firmware and logs
+that choice.
 
-## Capture and implementation sequence
+## Capture notes
 
 `examples/capture_hid_startup.py` polls for Emotiv HID interfaces before the
 headset is powered, records both receiver and EEG interfaces, and preserves
 raw report lengths and bytes. Run it before powering the headset:
 
 ```bash
-python -m pipenv run python examples/capture_hid_startup.py --seconds 20
+python -m pipenv run python examples/capture_hid_startup.py --seconds 60 >hid_capture.log 2>&1
 ```
 
-The next implementation step is to identify the type-7 report in that CSV,
-extract its seed, add a firmware-aware cipher/handshake layer, and run the
-decoded output through the existing channel conversion. Keep the capture's
-`report_hex` unchanged; only the serial-number column needs redaction before
-sharing.
+The CSV is written separately; `2>&1` preserves the recorder's diagnostics in
+the log as well. Without it, a shell's `>` redirect captures only stdout while
+the interface-discovery messages remain on the console (stderr).
+
+The CSV remains useful for steady-state reports, but the successful
+`data/capture.pcap` trace is the artifact that exposed the feature report. Keep
+raw report bytes unchanged; only the serial-number column needs redaction before
+sharing the CSV.
+
+The first hidapi-only capture opened both interfaces but produced only 32-byte
+input reports from `EEG Signals` (`usage=2`); the receiver (`usage=16`) was
+silent. USBPcap preserved the missing control transaction and confirmed that it
+is a feature transfer on the EEG collection, not a receiver input report.
 
 The recorder does not call Cortex, request access, or require an EEG license.
 It is therefore compatible with leaving EMOTIV Launcher running when that is
 needed to keep the Cortex service alive. Start the recorder while the headset
-is off; Launcher and the recorder can then observe the interfaces as the
-headset connects. If the operating system reports an access-denied error, stop
-only applications that are actively subscribing to EEG (such as EmotivPRO or a
-second raw-HID launcher), then retry; do not power the headset on before the
-recorder is ready.
+is off; then let Launcher/Cortex notice and connect the headset so its normal
+initialization exchange occurs while the recorder is listening. If the
+operating system reports an access-denied error, stop only applications that
+are actively subscribing to EEG (such as EmotivPRO or a second raw-HID
+launcher), then retry; do not power the headset on before the recorder is
+ready.
 
 ## Downgrade status
 
-The public EPOC X updater documents upgrading the USB and Bluetooth chips, not
-rollback. The service exposes recovery/update operations, but no public,
+The [public EPOC X updater](https://emotiv.gitbook.io/updating-firmware-1/epoc-x)
+documents upgrading the USB and Bluetooth chips, not rollback. The service exposes
+recovery/update operations, but no public,
 verified `0x710`/`0x720` image or anti-rollback-safe procedure was found. A
 desktop-app downgrade does not downgrade the headset firmware. The safe route
 for rollback is Emotiv Support supplying the signed images and exact two-chip
