@@ -94,13 +94,70 @@ Example:
 python -m pipenv run python main_cortex.py --streams dev eq pow met com fac
 ```
 
+### Firmware 0x740 raw EEG fallback
+
+EPOC X firmware `0x740` uses an encryption protocol that the legacy direct-HID
+decoder in this repository does not yet understand. Cortex performs that
+firmware-specific decryption for us, so a licensed Cortex application can
+publish the raw EEG stream directly:
+
+```bash
+python -m pipenv run python main_cortex.py --streams eeg
+```
+
+This creates an `Epoc X Cortex EEG` LSL outlet. Its columns are the `eeg` columns
+reported by Cortex (`COUNTER`, `INTERPOLATED`, the 14 EPOC X sensors, `RAW_CQ`,
+and `MARKER_HARDWARE`); the `MARKERS` object column is omitted because an LSL
+`float32` outlet cannot carry JSON objects. The outlet rate is taken from the
+headset's Cortex setting (normally 256 Hz for EPOC X).
+
+The Cortex `eeg` stream requires a paid license with the `eeg` scope and an
+activated session. The existing default `dev eq` bridge remains unactivated and
+continues to work for quality-only access. EmotivPRO's integrated LSL EEG outlet
+is another supported fallback when EmotivPRO is licensed.
+
+### Capture a firmware-740 startup handshake
+
+The direct HID decoder needs one control report that is sent during connection;
+the steady-state 32-byte EEG dump in issue #17 does not include it. To capture
+that report, insert the dongle, leave the headset powered off, and run the
+recorder before powering on the headset. It is fine to leave EMOTIV Launcher
+running if the Cortex service needs it; the recorder talks to HID directly and
+does not use Cortex login.
+
+```bash
+python -m pipenv run python examples/capture_hid_startup.py --seconds 20
+```
+
+Start the recorder first, then power on the headset and leave it running for a
+few seconds. It records both Emotiv HID interfaces and preserves the raw report
+length and bytes in `data/epocx_startup_hid.csv`; serial numbers can be redacted
+afterward, but do not alter the report bytes. That capture is the missing input
+needed to validate and finish the no-license firmware-740 decoder.
+
+The complete reverse-engineered design, including the firmware gate, startup
+seed, SHA-256/AES-256 derivation, and downgrade findings, is preserved in
+[`docs/firmware_0740_hid_path.md`](docs/firmware_0740_hid_path.md).
+
+The capture script is not part of the eventual acquisition workflow. Once the
+decoder is finished, it will collect and cache the handshake automatically on
+each headset connection while the Cortex service remains running for the
+quality streams; no Cortex `eeg` scope is involved.
+
 Notes:
 
-* You must be logged into EMOTIV Launcher on the same machine.
-* The app must be approved in EMOTIV Launcher.
-* This bridge uses Cortex over `wss://localhost:6868`.
-* It opens a Cortex session in `open` mode, not `active`, because the goal here
-  is to test `dev` and `eq`, not licensed raw EEG via Cortex.
+* The HID recorder does not require a Cortex app key, an EEG license, or an
+  EmotivPRO subscription.
+* Do not start a second copy of this repository's launcher or EmotivPRO's EEG
+  stream during capture. EMOTIV Launcher itself may remain running for the
+  Cortex service.
+* If the headset was already on, turn it off after starting the recorder and
+  power it on again; the connection-time report is the important one.
+
+The separate Cortex bridge uses `wss://localhost:6868`; quality-only runs
+(`dev`, `eq`, etc.) use an unactivated `open` session, while a run that includes
+`eeg` requests an `active` session and consumes the appropriate EEG license
+quota.
 
 To view the contact quality stream as a live head map:
 

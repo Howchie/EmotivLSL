@@ -1,4 +1,5 @@
 import json
+import sys
 import tkinter as tk
 from dataclasses import dataclass
 from pathlib import Path
@@ -118,6 +119,36 @@ def pick_panel_image() -> Path:
         if path.exists():
             return path
     raise FileNotFoundError("No panel image found. Expected head_image.png or example_cq.png in the repo root.")
+
+
+def load_panel_image(root: tk.Tk) -> tuple[tk.PhotoImage, tk.PhotoImage, Path]:
+    """Load and resize the panel image while preserving Tk's image ownership.
+
+    Tk does not retain Python references to images used by a canvas.  Keep both
+    image objects alive explicitly, including the source used for subsampling.
+    """
+    image_path = pick_panel_image()
+    try:
+        source_image = tk.PhotoImage(master=root, file=str(image_path))
+        subsample_factor = max(1, (source_image.width() + MAX_PANEL_WIDTH - 1) // MAX_PANEL_WIDTH)
+        panel_image = source_image.subsample(subsample_factor, subsample_factor)
+    except tk.TclError as exc:
+        tk_version = root.tk.call("info", "patchlevel")
+        raise RuntimeError(
+            f"Tk {tk_version} could not render panel image {image_path} "
+            f"({image_path.stat().st_size:,} bytes)."
+        ) from exc
+
+    if panel_image.width() <= 0 or panel_image.height() <= 0:
+        raise RuntimeError(f"Tk loaded an empty panel image from {image_path}.")
+
+    print(
+        f"Loaded panel image {image_path} ({source_image.width()}x{source_image.height()} -> "
+        f"{panel_image.width()}x{panel_image.height()}) with Tk {root.tk.call('info', 'patchlevel')}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return source_image, panel_image, image_path
 
 
 def scale_point(panel_left: int, panel_top: int, panel_width: int, panel_height: int, norm_x: float, norm_y: float) -> tuple[float, float]:
@@ -248,9 +279,7 @@ class DualQualityViewer:
         self.root.minsize(900, 600)
         self.root.bind("<Escape>", lambda _event: self.root.destroy())
         self.root.bind("<Control-w>", lambda _event: self.root.destroy())
-        source_image = tk.PhotoImage(file=str(pick_panel_image()))
-        subsample_factor = max(1, (source_image.width() + MAX_PANEL_WIDTH - 1) // MAX_PANEL_WIDTH)
-        self.panel_image = source_image.subsample(subsample_factor, subsample_factor)
+        self.source_image, self.panel_image, self.panel_image_path = load_panel_image(self.root)
         self.panel_width = self.panel_image.width()
         self.panel_height = self.panel_image.height()
 
@@ -282,6 +311,8 @@ class DualQualityViewer:
         x_scroll.grid(row=1, column=0, sticky="ew")
         canvas_frame.grid_rowconfigure(0, weight=1)
         canvas_frame.grid_columnconfigure(0, weight=1)
+        # Canvas itself does not keep a Python reference to PhotoImage objects.
+        self.canvas.image = self.panel_image
 
         self.status_var = tk.StringVar(value="Looking for LSL quality streams...")
         self.status_label = tk.Label(self.root, textvariable=self.status_var, bg="white", fg="#333333")

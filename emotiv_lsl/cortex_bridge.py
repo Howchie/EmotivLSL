@@ -37,6 +37,10 @@ class BridgeConfig:
 
 
 STREAM_SPECS = {
+    # Raw EEG is delivered by Cortex after it has performed the firmware-
+    # specific decryption.  Keep this outlet name distinct from the legacy
+    # direct-HID outlet so both paths can be run side by side while testing.
+    "eeg": StreamSpec("eeg", "Epoc X Cortex EEG", "EEG", "float32", 0),
     "dev": StreamSpec("dev", "Epoc X Contact Quality", "EmotivCQ", "float32", 2),
     "eq": StreamSpec("eq", "Epoc X EEG Quality", "EmotivEQ", "float32", 2),
     "pow": StreamSpec("pow", "Epoc X Band Power", "EmotivPow", "float32", 8),
@@ -125,10 +129,11 @@ def flatten_values(values: list) -> list:
     return flattened
 
 
-def create_outlet(spec: StreamSpec, labels: list[str]) -> StreamOutlet:
-    info = StreamInfo(spec.lsl_name, spec.lsl_type, len(flatten_labels(labels)), spec.nominal_srate, spec.channel_format)
+def create_outlet(spec: StreamSpec, labels: list[str], nominal_srate: float | None = None) -> StreamOutlet:
+    rate = spec.nominal_srate if nominal_srate is None else nominal_srate
+    info = StreamInfo(spec.lsl_name, spec.lsl_type, len(flatten_labels(labels)), rate, spec.channel_format)
     info.desc().append_child_value("source_stream", spec.cortex_name)
-    info.desc().append_child_value("cortex_nominal_srate_hz", str(spec.nominal_srate))
+    info.desc().append_child_value("cortex_nominal_srate_hz", str(rate))
     add_channel_metadata(info, labels)
     return StreamOutlet(info)
 
@@ -138,6 +143,31 @@ def convert_sample(values: list, channel_format: str) -> list:
     if channel_format == "string":
         return ["" if value is None else str(value) for value in flattened]
     return [float("nan") if value is None else float(value) for value in flattened]
+
+
+def convert_stream_sample(stream_name: str, values: list, labels: list[str], channel_format: str) -> list:
+    """Convert one Cortex sample while handling EEG's marker-object column.
+
+    Cortex's ``eeg`` stream ends with ``MARKERS``, whose value is an array of
+    JSON objects rather than a numeric sample.  LSL's float outlet cannot carry
+    that object, so the marker column is intentionally omitted from the EEG
+    outlet.  ``MARKER_HARDWARE`` remains available as a numeric channel.
+    """
+    if stream_name != "eeg":
+        return convert_sample(values, channel_format)
+
+    numeric_values = [value for label, value in zip(labels, values) if label != "MARKERS"]
+    return convert_sample(numeric_values, channel_format)
+
+
+def eeg_nominal_rate(headset: dict) -> float:
+    """Return Cortex's configured EPOC X EEG rate for LSL metadata."""
+    settings = headset.get("settings", {})
+    try:
+        rate = float(settings.get("eegRate", 256))
+    except (TypeError, ValueError):
+        rate = 256.0
+    return rate if rate > 0 else 256.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -152,7 +182,7 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         choices=sorted(STREAM_SPECS),
         default=list(DEFAULT_STREAMS),
-        help="Cortex streams to bridge to LSL",
+        help="Cortex streams to bridge to LSL (eeg requires an activated EEG license)",
     )
     parser.add_argument(
         "--verify-ssl",
@@ -264,13 +294,13 @@ def wait_for_connected_headset(client: CortexClient, headset_id: str | None) -> 
     raise CortexError("No connected headset available in Cortex.")
 
 
-def open_session(client: CortexClient, token: str, headset_id: str) -> str:
+def open_session(client: CortexClient, token: str, headset_id: str, status: str = "open") -> str:
     result = client.call(
         "createSession",
         {
             "cortexToken": token,
             "headset": headset_id,
-            "status": "open",
+            "status": status,
         },
     )
     return result["id"]
@@ -329,15 +359,24 @@ def run_bridge(config: BridgeConfig) -> None:
         headset = wait_for_connected_headset(client, config.headset_id)
         print(f"Using headset {headset['id']}", file=sys.stderr, flush=True)
 
-        session_id = open_session(client, token, headset["id"])
+        # Cortex requires an activated (licensed) session for raw EEG.  The
+        # existing quality-only default stays unactivated so it remains usable
+        # with a free account.
+        session_status = "active" if "eeg" in config.streams else "open"
+        session_id = open_session(client, token, headset["id"], session_status)
         subscriptions = subscribe_streams(client, token, session_id, list(config.streams))
 
         outlets: dict[str, StreamOutlet] = {}
         for stream_name, labels in subscriptions.items():
             spec = STREAM_SPECS[stream_name]
-            outlets[stream_name] = create_outlet(spec, labels)
+            # MARKERS is an array of marker objects and cannot be represented in
+            # the numeric EEG outlet.  All other EEG columns are numeric and
+            # retain Cortex's documented order.
+            publish_labels = [label for label in labels if not (stream_name == "eeg" and label == "MARKERS")]
+            rate = eeg_nominal_rate(headset) if stream_name == "eeg" else None
+            outlets[stream_name] = create_outlet(spec, publish_labels, nominal_srate=rate)
             print(
-                f"Publishing {stream_name} as LSL '{spec.lsl_name}' with columns {labels!r}",
+                f"Publishing {stream_name} as LSL '{spec.lsl_name}' with columns {publish_labels!r}",
                 file=sys.stderr,
                 flush=True,
             )
@@ -353,7 +392,12 @@ def run_bridge(config: BridgeConfig) -> None:
                 if stream_name not in message:
                     continue
 
-                values = convert_sample(message[stream_name], STREAM_SPECS[stream_name].channel_format)
+                values = convert_stream_sample(
+                    stream_name,
+                    message[stream_name],
+                    subscriptions[stream_name],
+                    STREAM_SPECS[stream_name].channel_format,
+                )
                 sample_timestamp = message.get("time")
                 lsl_timestamp = sample_timestamp + cortex_to_lsl_offset if sample_timestamp is not None else None
                 if lsl_timestamp is None:
