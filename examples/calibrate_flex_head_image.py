@@ -4,13 +4,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import tkinter as tk
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+# When this file is run as ``python examples/...py``, Python puts only the
+# examples directory on sys.path.  Add the repository root so the package
+# import works from both the repository root and another working directory.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from emotiv_lsl.flex_layout import FLEX_10_20_LOCATIONS
 
 
-ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_IMAGE_PATH = ROOT / "images" / "10-20.png"
 DEFAULT_CALIBRATION_PATH = ROOT / "flex_head_image_coords.json"
 CLICK_SEQUENCE = FLEX_10_20_LOCATIONS + ("OVERALL",)
@@ -143,4 +150,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
