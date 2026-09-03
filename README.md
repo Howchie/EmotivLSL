@@ -239,7 +239,12 @@ python -m pipenv run python examples/calibrate_flex_head_image.py
 ```
 
 The points are saved to `flex_head_image_coords.json` and can be regenerated if
-the image or display scaling changes.
+the image or sensor placements change.
+
+The Flex quality viewer downsamples the reference image to a panel width of at
+most 420 pixels so both quality panels fit on a 1080p display.  The calibration
+values are normalized (0–1), so the overlay locations stay aligned automatically;
+the calibration JSON does not need to be edited when the viewer scales the image.
 
 If a computer cannot render the PNG correctly, pass `--no-background` to
 `main_all_flex.py`; the viewer will show the full calibrated coordinate layout

@@ -32,9 +32,13 @@ DEFAULT_CALIBRATION_PATH = ROOT / "flex_head_image_coords.json"
 DEFAULT_MAPPING_PATH = ROOT / "epoch_flex_electrodes.json"
 DEFAULT_STREAM_PREFIX = "Epoc Flex 1.0"
 
-MAX_PANEL_WIDTH = 520
-PANEL_GAP = 24
-WINDOW_PADDING = 16
+# Keep the two Flex panels close to the size used by the EPOC X viewer.  The
+# source image is 1,062 px wide, so drawing it at its native size makes the
+# two-panel canvas wider than a typical 1080p desktop.  Coordinates below are
+# normalized and therefore continue to line up with a resized image.
+MAX_PANEL_WIDTH = 420
+PANEL_GAP = 18
+WINDOW_PADDING = 12
 HEADER_HEIGHT = 36
 INACTIVE_RADIUS = 5
 SENSOR_RADIUS = 11
@@ -56,6 +60,9 @@ class PanelImage:
     width: int
     height: int
     error: str | None = None
+    # Keep the source alive when ``image`` is a downsampled PhotoImage.  Tk's
+    # canvas only retains the image by Tcl name, not by Python reference.
+    source: tk.PhotoImage | None = None
 
 
 @dataclass
@@ -121,17 +128,60 @@ def load_panel_image(
     height = int(calibration.get("image_height", 0))
     if width <= 0 or height <= 0:
         raise ValueError("Flex calibration must contain positive image dimensions")
+
+    # Tk's native resize operation is an integer subsample.  Use the same
+    # rule as the EPOC X viewer: choose the smallest factor that keeps a
+    # panel at or below MAX_PANEL_WIDTH.  The calibration points are stored
+    # as normalized coordinates, so no JSON coordinate rewrite is needed.
+    def scaled_dimensions(source_width: int, source_height: int) -> tuple[int, int]:
+        factor = max(1, (source_width + MAX_PANEL_WIDTH - 1) // MAX_PANEL_WIDTH)
+        return (
+            max(1, (source_width + factor - 1) // factor),
+            max(1, (source_height + factor - 1) // factor),
+        )
+
     if no_background:
-        return PanelImage(None, None, width, height, "disabled by --no-background")
+        scaled_width, scaled_height = scaled_dimensions(width, height)
+        return PanelImage(
+            None,
+            None,
+            scaled_width,
+            scaled_height,
+            "disabled by --no-background",
+        )
 
     try:
-        image = tk.PhotoImage(master=root, file=str(image_path))
+        source_image = tk.PhotoImage(master=root, file=str(image_path))
     except (tk.TclError, OSError) as exc:
-        return PanelImage(None, None, width, height, f"could not load {image_path}: {exc}")
+        scaled_width, scaled_height = scaled_dimensions(width, height)
+        return PanelImage(
+            None,
+            None,
+            scaled_width,
+            scaled_height,
+            f"could not load {image_path}: {exc}",
+        )
 
-    # The coordinates are normalized, so a replacement image can have a
-    # different size.  Use the actual image dimensions when it loads.
-    return PanelImage(image, image_path, image.width(), image.height())
+    subsample_factor = max(
+        1,
+        (source_image.width() + MAX_PANEL_WIDTH - 1) // MAX_PANEL_WIDTH,
+    )
+    image = source_image.subsample(subsample_factor, subsample_factor)
+    print(
+        f"Loaded Flex panel image {image_path} ({source_image.width()}x{source_image.height()} "
+        f"-> {image.width()}x{image.height()}) with Tk {root.tk.call('info', 'patchlevel')}",
+        file=sys.stderr,
+        flush=True,
+    )
+    # The coordinates are normalized, so the actual rendered dimensions are
+    # the only values the panel needs after downsampling.
+    return PanelImage(
+        image,
+        image_path,
+        image.width(),
+        image.height(),
+        source=source_image,
+    )
 
 
 def channel_labels(info) -> list[str]:
