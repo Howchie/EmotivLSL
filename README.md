@@ -175,6 +175,25 @@ The separate Cortex bridge uses `wss://localhost:6868`; quality-only runs
 `eeg` requests an `active` session and consumes the appropriate EEG license
 quota.
 
+### Original EPOC Flex (Flex 1.0)
+
+The original Flex 1.0 controller uses a different HID protocol from both EPOC X
+and Flex 2.0. Its direct reader is kept separate while the protocol is being
+validated:
+
+```bash
+python -m pipenv run python main_flex.py
+```
+
+The reader selects the dongle's `EEG Signals` collection, decrypts its 32-byte
+AES-128 reports, and reconstructs the 32 compressed EEG channels at 128 Hz. It
+does not require a Cortex EEG license and can run alongside EMOTIV Launcher and
+the quality-only Cortex bridge. Flex 1.0 sensor placement is configurable, so
+the stream labels are the stable controller wire names (`LA..LQ`, `RA..RQ`);
+apply the session's montage separately. The full reverse-engineered path and
+current caveats are in
+[`docs/flex_1_hid_path.md`](docs/flex_1_hid_path.md).
+
 To view the contact quality stream as a live head map:
 
 ```bash
