@@ -228,6 +228,16 @@ contact quality stream as a live head map:
 python -m pipenv run python examples/view_contact_quality.py
 ```
 
+To calibrate the complete Flex reference image (all available 10-20 locations,
+not only the locations active in the current montage):
+
+```bash
+python -m pipenv run python examples/calibrate_flex_head_image.py
+```
+
+The points are saved to `flex_head_image_coords.json` and can be regenerated if
+the image or display scaling changes.
+
 This viewer subscribes to both `Epoc X Contact Quality` and `Epoc X EEG Quality`
 and renders two live head maps side by side. Each sensor is colored from
 black/red through green based on the `0..4` quality scale, while each panel also
