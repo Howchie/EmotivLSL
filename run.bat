@@ -35,5 +35,5 @@ if errorlevel 1 (
     exit /b 1
 )
 
-python -m pipenv run python main_all.py --client-id mJpALzbxF3J6eAbiz9GPNnmJOkTz7f7COgBnFgLh --client-secret tVhpfg716GTkH0dhkBr0rznta0Su8QGwYKohxDO9F7Ya2FmS3hkJFOHXesuMjXCc59zIeXp2ARl1D9eF4aoSzt25jy1AUZftsri07VkEHCp2HX6WkalQ2cdBWv578TVB --streams dev eq pow
+python -m pipenv run python main_all.py --client-id 3hQag0PH5ruAjQ6sWmkC3OPZs4EHL8Rmz1W92g3Z --client-secret 0UmT695g4xIu96M2zk9NAu4vB0KTPPX5MhnGBV1EFNNYeyB1OJf0h9TMLa5BB9gZibuegusB6Tc0nZWhJTkay7Ed629nlHRiq974jCjA8rdRgKh98uFSB4361Z4ehzpg --streams dev eq pow
 pause
