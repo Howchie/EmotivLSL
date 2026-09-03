@@ -100,10 +100,25 @@ initial pairing handshake. EMOTIV Launcher can remain running in parallel so
 the Cortex API bridge can provide `dev`/`eq` quality streams; this direct HID
 reader does not request the licensed Cortex `eeg` stream.
 
+When using `main_all_flex.py`, the same montage is also supplied as the
+`mappings` object in Cortex's `controlDevice connect` request. The original
+Flex path requires that object when Cortex connects a discovered headset.
+
 If a USB report is lost, the 7-bit deltas between the missing and next report
 cannot be reconstructed. The reader counts the counter discontinuity and
 restarts the ADC state at the midpoint to avoid carrying a false accumulated
 offset. This is preferable to mixing motion/status packets into the EEG index.
+
+### Packet-gap discontinuities and analysis
+
+Restarting the ADC state at the midpoint preserves a usable numerical stream,
+but it can introduce a step discontinuity at the first sample after a lost
+report. This is an acquisition discontinuity, not a change in the CMS/DRL
+hardware reference, and `--remove-dc` does not detect or repair it. Do not treat
+the affected samples as a genuine EEG transient. For analysis, use the packet
+counter/logging (or an equivalent timestamp-gap check) to mark the gap and
+reject a short window around it; only interpolate if that is appropriate for the
+specific downstream method.
 
 ## Firmware downgrade status
 

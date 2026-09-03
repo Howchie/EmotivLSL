@@ -35,6 +35,7 @@ class BridgeConfig:
     verify_ssl: bool = False
     print_samples: bool = False
     stream_prefix: str = "Epoc X"
+    headset_mappings: dict[str, str] | None = None
 
 
 STREAM_SPECS = {
@@ -294,7 +295,11 @@ def print_headsets(headsets: list[dict]) -> None:
         )
 
 
-def wait_for_connected_headset(client: CortexClient, headset_id: str | None) -> dict:
+def wait_for_connected_headset(
+    client: CortexClient,
+    headset_id: str | None,
+    headset_mappings: dict[str, str] | None = None,
+) -> dict:
     client.call("controlDevice", {"command": "refresh"})
     deadline = time.time() + 15
 
@@ -315,7 +320,12 @@ def wait_for_connected_headset(client: CortexClient, headset_id: str | None) -> 
         for headset in matches:
             if headset.get("status") == "discovered":
                 print(f"Connecting headset {headset['id']}...", file=sys.stderr, flush=True)
-                client.call("controlDevice", {"command": "connect", "headset": headset["id"]})
+                connect_params = {"command": "connect", "headset": headset["id"]}
+                if headset_mappings:
+                    # Original Flex requires this object when connecting a
+                    # discovered headset. EPOC X callers leave it unset.
+                    connect_params["mappings"] = headset_mappings
+                client.call("controlDevice", connect_params)
                 break
 
         time.sleep(POLL_INTERVAL_SECONDS)
@@ -385,7 +395,11 @@ def run_bridge(config: BridgeConfig) -> None:
         ensure_access(client, config.client_id, config.client_secret)
         token = authorize(client, config.client_id, config.client_secret, config.license)
 
-        headset = wait_for_connected_headset(client, config.headset_id)
+        headset = wait_for_connected_headset(
+            client,
+            config.headset_id,
+            config.headset_mappings,
+        )
         print(f"Using headset {headset['id']}", file=sys.stderr, flush=True)
 
         # Cortex requires an activated (licensed) session for raw EEG.  The

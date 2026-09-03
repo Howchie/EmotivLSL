@@ -6,7 +6,6 @@ import argparse
 import os
 import sys
 import threading
-import time
 import traceback
 from pathlib import Path
 
@@ -16,6 +15,8 @@ from emotiv_lsl.flex_montage import load_flex_montage
 
 
 DEFAULT_MAPPING_PATH = Path(__file__).resolve().with_name("epoch_flex_electrodes.json")
+DEFAULT_CALIBRATION_PATH = Path(__file__).resolve().with_name("flex_head_image_coords.json")
+DEFAULT_IMAGE_PATH = Path(__file__).resolve().parent / "images" / "10-20.png"
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,6 +55,28 @@ def parse_args() -> argparse.Namespace:
         "--serial",
         help="select a specific Flex dongle serial when multiple receivers are connected",
     )
+    parser.add_argument(
+        "--calibration",
+        default=str(DEFAULT_CALIBRATION_PATH),
+        metavar="PATH",
+        help=f"calibrated Flex quality-image coordinates (default: {DEFAULT_CALIBRATION_PATH.name})",
+    )
+    parser.add_argument(
+        "--image",
+        default=str(DEFAULT_IMAGE_PATH),
+        metavar="PATH",
+        help=f"Flex quality background image (default: {DEFAULT_IMAGE_PATH.name})",
+    )
+    parser.add_argument(
+        "--no-background",
+        action="store_true",
+        help="launch the quality map with calibrated markers but without the PNG background",
+    )
+    parser.add_argument(
+        "--no-viewer",
+        action="store_true",
+        help="run the EEG and Cortex streams without opening the quality-map window",
+    )
     args = parser.parse_args()
     if not args.client_id or not args.client_secret:
         parser.error(
@@ -78,7 +101,7 @@ def start_eeg(
     ).main_loop()
 
 
-def start_quality_bridge(args: argparse.Namespace) -> None:
+def start_quality_bridge(args: argparse.Namespace, headset_mappings: dict[str, str]) -> None:
     run_bridge(
         BridgeConfig(
             client_id=args.client_id,
@@ -90,6 +113,7 @@ def start_quality_bridge(args: argparse.Namespace) -> None:
             verify_ssl=args.verify_ssl,
             print_samples=args.print_samples,
             stream_prefix=args.stream_prefix,
+            headset_mappings=headset_mappings,
         )
     )
 
@@ -107,6 +131,19 @@ def run_component(
         print(f"{name} failed: {exc}", file=sys.stderr, flush=True)
         traceback.print_exc()
         stop_event.set()
+
+
+def wait_for_components(
+    eeg_thread: threading.Thread,
+    quality_thread: threading.Thread,
+    stop_event: threading.Event,
+) -> None:
+    try:
+        while not stop_event.wait(0.5):
+            if not eeg_thread.is_alive() and not quality_thread.is_alive():
+                break
+    except KeyboardInterrupt:
+        pass
 
 
 def main() -> None:
@@ -136,7 +173,14 @@ def main() -> None:
     )
     quality_thread = threading.Thread(
         target=run_component,
-        args=("Cortex quality bridge", lambda: start_quality_bridge(args), stop_event),
+        args=(
+            "Cortex quality bridge",
+            lambda: start_quality_bridge(
+                args,
+                {**montage.references, **montage.mapping},
+            ),
+            stop_event,
+        ),
         daemon=True,
         name="cortex-quality",
     )
@@ -144,11 +188,28 @@ def main() -> None:
     quality_thread.start()
 
     try:
-        while not stop_event.wait(0.5):
-            if not eeg_thread.is_alive() and not quality_thread.is_alive():
-                break
-    except KeyboardInterrupt:
-        pass
+        if args.no_viewer:
+            wait_for_components(eeg_thread, quality_thread, stop_event)
+        else:
+            from examples.view_flex_quality import FlexQualityViewer, load_calibration
+
+            try:
+                viewer = FlexQualityViewer(
+                    montage=montage,
+                    calibration=load_calibration(Path(args.calibration)),
+                    image_path=Path(args.image),
+                    stream_prefix=args.stream_prefix,
+                    no_background=args.no_background,
+                )
+            except Exception as exc:
+                print(
+                    f"Flex quality viewer unavailable ({exc}); continuing with LSL streams only.",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                wait_for_components(eeg_thread, quality_thread, stop_event)
+            else:
+                viewer.run()
     finally:
         stop_event.set()
         print("Flex EEG and Cortex quality streams stopped.", file=sys.stderr, flush=True)

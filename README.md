@@ -194,8 +194,11 @@ default [`epoch_flex_electrodes.json`](epoch_flex_electrodes.json) is a direct
 Emotiv Launcher configuration export; edit that file whenever the plugs are
 rearranged. The reader preserves the fixed wire order but publishes the
 configured locations as the LSL channel labels, while retaining the wire name
-in each channel's `wire` metadata field. A different file can be supplied with
-`--mapping PATH`. The full reverse-engineered path and current caveats are in
+in each channel's `wire` metadata field. `main_all_flex.py` also passes the
+same mapping object to Cortex when it connects the Flex headset; Flex requires
+that object for a discovered-headset connection. A different file can be
+supplied with `--mapping PATH`. The full reverse-engineered path and current
+caveats are in
 [`docs/flex_1_hid_path.md`](docs/flex_1_hid_path.md).
 
 To launch Flex EEG and the unlicensed Cortex quality streams together:
@@ -219,10 +222,10 @@ HID serial:
 python -m pipenv run python main_flex.py --serial UD... --remove-dc
 ```
 
-The existing `examples/view_contact_quality.py` is still the 14-sensor EPOC X
-viewer and is not launched by `main_all_flex.py`; a 32-sensor Flex viewer will
-use this montage file in a subsequent update. To view the current EPOC X
-contact quality stream as a live head map:
+The existing `examples/view_contact_quality.py` remains the 14-sensor EPOC X
+viewer. `main_all_flex.py` launches the Flex viewer automatically after the
+streams start; use `--no-viewer` for a headless LSL-only run. To view the
+current EPOC X contact quality stream as a live head map:
 
 ```bash
 python -m pipenv run python examples/view_contact_quality.py
@@ -237,6 +240,10 @@ python -m pipenv run python examples/calibrate_flex_head_image.py
 
 The points are saved to `flex_head_image_coords.json` and can be regenerated if
 the image or display scaling changes.
+
+If a computer cannot render the PNG correctly, pass `--no-background` to
+`main_all_flex.py`; the viewer will show the full calibrated coordinate layout
+and active quality markers on a plain canvas.
 
 This viewer subscribes to both `Epoc X Contact Quality` and `Epoc X EEG Quality`
 and renders two live head maps side by side. Each sensor is colored from
