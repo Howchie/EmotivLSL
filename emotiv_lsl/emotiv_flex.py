@@ -6,14 +6,15 @@ AES-128-ECB encrypted and the decrypted payload contains 32 signed seven-bit
 delta samples.  This module intentionally does not touch the Cortex session;
 it can therefore run beside the quality-only Cortex bridge.
 
-The wire labels (LA..LQ and RA..RQ) are used as LSL channel labels.  Flex 1.0
-allows the user to map those wires to arbitrary 10-20 positions, so a caller
-that knows the montage should replace the labels in the stream metadata.
+The packet order is always the wire labels (LA..LQ and RA..RQ). Flex 1.0
+allows the user to map those wires to arbitrary 10-20 positions, so callers
+can replace the LSL labels while retaining the wire name in channel metadata.
 """
 
 from __future__ import annotations
 
 import sys
+from collections.abc import Sequence
 
 import hid
 from Crypto.Cipher import AES
@@ -42,9 +43,34 @@ class EmotivFlex(EmotivBase):
         "RJ", "RK", "RL", "RM", "RN", "RO", "RP", "RQ",
     )
 
-    def __init__(self, remove_dc: bool = False) -> None:
+    def __init__(
+        self,
+        remove_dc: bool = False,
+        channel_labels: Sequence[str] | None = None,
+        montage_name: str | None = None,
+        references: dict[str, str] | None = None,
+        serial_number: str | None = None,
+    ) -> None:
         self.cipher: AES | None = None
         self.remove_dc = remove_dc
+        if channel_labels is None:
+            channel_labels = self.CH_NAMES
+        if len(channel_labels) != len(self.CH_NAMES):
+            raise ValueError(
+                f"Flex channel mapping must contain {len(self.CH_NAMES)} labels; "
+                f"got {len(channel_labels)}"
+            )
+        normalized_labels = tuple(str(label).strip() for label in channel_labels)
+        if any(not label for label in normalized_labels):
+            raise ValueError("Flex channel labels must not be empty")
+        self.channel_labels = normalized_labels
+        self.montage_name = montage_name or "wire labels"
+        self.references = {
+            str(key): str(value)
+            for key, value in (references or {}).items()
+            if str(value).strip()
+        }
+        self.serial_number = serial_number.strip() if serial_number else None
         self._adc = [self.ADC_MIDPOINT] * len(self.CH_NAMES)
         self._last_counter: int | None = None
         self.packet_gaps = 0
@@ -72,10 +98,29 @@ class EmotivFlex(EmotivBase):
 
     def get_hid_device(self) -> dict:
         devices = self.get_hid_devices()
+        if self.serial_number:
+            devices = [
+                device
+                for device in devices
+                if str(device.get("serial_number") or "") == self.serial_number
+            ]
         if not devices:
+            if self.serial_number:
+                raise RuntimeError(
+                    "Original EPOC Flex EEG HID collection with serial "
+                    f"{self.serial_number!r} was not found; check the dongle "
+                    "serial or omit --serial when only one Emotiv receiver is connected."
+                )
             raise RuntimeError(
                 "Original EPOC Flex EEG HID collection not found; "
                 "connect the Flex 1.0 dongle and headset first."
+            )
+        if len(devices) > 1:
+            descriptions = "; ".join(self.describe_hid_device(device) for device in devices)
+            raise RuntimeError(
+                "More than one Flex-compatible EEG HID collection was found. "
+                "Disconnect other Emotiv receivers or pass --serial. "
+                f"Candidates: {descriptions}"
             )
         return devices[0]
 
@@ -183,9 +228,11 @@ class EmotivFlex(EmotivBase):
             "float32",
         )
         channels = info.desc().append_child("channels")
-        for label in self.CH_NAMES:
+        for wire_label, label in zip(self.CH_NAMES, self.channel_labels):
             channel = channels.append_child("channel")
             channel.append_child_value("label", label)
+            channel.append_child_value("wire", wire_label)
+            channel.append_child_value("location", label)
             channel.append_child_value("unit", "microvolts")
             channel.append_child_value("type", "EEG")
             channel.append_child_value("scaling_factor", str(self.LSB_UV))
@@ -193,6 +240,9 @@ class EmotivFlex(EmotivBase):
         cap = info.desc().append_child("cap")
         cap.append_child_value("name", "EPOC Flex 1.0")
         cap.append_child_value("labelscheme", "user-configurable 10-20")
+        cap.append_child_value("montage", self.montage_name)
+        for reference, location in sorted(self.references.items()):
+            cap.append_child_value(reference.lower(), location)
         return info
 
     def main_loop(self) -> None:

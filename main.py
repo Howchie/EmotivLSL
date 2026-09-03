@@ -2,7 +2,8 @@ import argparse
 
 from emotiv_lsl.emotiv_epoc_x import EmotivEpocX
 
-if __name__ == "__main__":
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--emit-debug',
@@ -21,3 +22,7 @@ if __name__ == "__main__":
         packet_log_path=args.log_decrypted,
     )
     emotiv_epoc_x.main_loop()
+
+
+if __name__ == "__main__":
+    main()

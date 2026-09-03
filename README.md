@@ -21,8 +21,9 @@ python -m pipenv sync --dev
 Disable the motion data in Emotiv app settings  
 Connect dongle, turn on the headset, wait for the light from two indicators
 
-On Windows, `run.bat` launches the EEG and Cortex LSL streams with the
-repository's configured developer credentials and `dev eq pow` streams.
+On Windows, `run.bat` (or the explicit `run_epochX.bat`) launches the EPOC X
+EEG and Cortex LSL streams with the repository's configured developer
+credentials.  `run_flex.bat` launches the original EPOC Flex 1.0 path.
 
 ```
 # frist terminal
@@ -188,13 +189,40 @@ python -m pipenv run python main_flex.py
 The reader selects the dongle's `EEG Signals` collection, decrypts its 32-byte
 AES-128 reports, and reconstructs the 32 compressed EEG channels at 128 Hz. It
 does not require a Cortex EEG license and can run alongside EMOTIV Launcher and
-the quality-only Cortex bridge. Flex 1.0 sensor placement is configurable, so
-the stream labels are the stable controller wire names (`LA..LQ`, `RA..RQ`);
-apply the session's montage separately. The full reverse-engineered path and
-current caveats are in
+the quality-only Cortex bridge. Flex 1.0 sensor placement is configurable. The
+default [`epoch_flex_electrodes.json`](epoch_flex_electrodes.json) is a direct
+Emotiv Launcher configuration export; edit that file whenever the plugs are
+rearranged. The reader preserves the fixed wire order but publishes the
+configured locations as the LSL channel labels, while retaining the wire name
+in each channel's `wire` metadata field. A different file can be supplied with
+`--mapping PATH`. The full reverse-engineered path and current caveats are in
 [`docs/flex_1_hid_path.md`](docs/flex_1_hid_path.md).
 
-To view the contact quality stream as a live head map:
+To launch Flex EEG and the unlicensed Cortex quality streams together:
+
+```bash
+python -m pipenv run python main_all_flex.py \
+  --client-id YOUR_ID --client-secret YOUR_SECRET --remove-dc
+```
+
+On Windows, double-click `run_flex.bat`. It uses `dev` and `eq` by default and
+publishes them with the `Epoc Flex 1.0` prefix so they do not collide with EPOC
+X quality outlets (`Epoc Flex 1.0 Contact Quality` and `Epoc Flex 1.0 EEG
+Quality`). `main_all_epochX.py`, `main_epochX.py`, and
+`run_epochX.bat` are explicit EPOC X entry points; the unsuffixed EPOC X
+entry points remain as compatibility aliases.
+
+If more than one Emotiv receiver is connected, select the Flex dongle by its
+HID serial:
+
+```bash
+python -m pipenv run python main_flex.py --serial UD... --remove-dc
+```
+
+The existing `examples/view_contact_quality.py` is still the 14-sensor EPOC X
+viewer and is not launched by `main_all_flex.py`; a 32-sensor Flex viewer will
+use this montage file in a subsequent update. To view the current EPOC X
+contact quality stream as a live head map:
 
 ```bash
 python -m pipenv run python examples/view_contact_quality.py

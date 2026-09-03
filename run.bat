@@ -35,5 +35,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-python -m pipenv run python main_all.py --client-id 3hQag0PH5ruAjQ6sWmkC3OPZs4EHL8Rmz1W92g3Z --client-secret 0UmT695g4xIu96M2zk9NAu4vB0KTPPX5MhnGBV1EFNNYeyB1OJf0h9TMLa5BB9gZibuegusB6Tc0nZWhJTkay7Ed629nlHRiq974jCjA8rdRgKh98uFSB4361Z4ehzpg --streams dev eq pow
+set "LAUNCH_SCRIPT=main_all_epochX.py"
+set "LAUNCH_ARGS=--streams dev eq pow"
+if /I "%~1"=="flex" (
+    set "LAUNCH_SCRIPT=main_all_flex.py"
+    set "LAUNCH_ARGS=--streams dev eq --mapping epoch_flex_electrodes.json --remove-dc"
+)
+
+python -m pipenv run python %LAUNCH_SCRIPT% --client-id 3hQag0PH5ruAjQ6sWmkC3OPZs4EHL8Rmz1W92g3Z --client-secret 0UmT695g4xIu96M2zk9NAu4vB0KTPPX5MhnGBV1EFNNYeyB1OJf0h9TMLa5BB9gZibuegusB6Tc0nZWhJTkay7Ed629nlHRiq974jCjA8rdRgKh98uFSB4361Z4ehzpg %LAUNCH_ARGS%
 pause

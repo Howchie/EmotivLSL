@@ -34,6 +34,7 @@ class BridgeConfig:
     streams: tuple[str, ...] = DEFAULT_STREAMS
     verify_ssl: bool = False
     print_samples: bool = False
+    stream_prefix: str = "Epoc X"
 
 
 STREAM_SPECS = {
@@ -129,13 +130,35 @@ def flatten_values(values: list) -> list:
     return flattened
 
 
-def create_outlet(spec: StreamSpec, labels: list[str], nominal_srate: float | None = None) -> StreamOutlet:
+def create_outlet(
+    spec: StreamSpec,
+    labels: list[str],
+    nominal_srate: float | None = None,
+    lsl_name: str | None = None,
+) -> StreamOutlet:
     rate = spec.nominal_srate if nominal_srate is None else nominal_srate
-    info = StreamInfo(spec.lsl_name, spec.lsl_type, len(flatten_labels(labels)), rate, spec.channel_format)
+    info = StreamInfo(
+        spec.lsl_name if lsl_name is None else lsl_name,
+        spec.lsl_type,
+        len(flatten_labels(labels)),
+        rate,
+        spec.channel_format,
+    )
     info.desc().append_child_value("source_stream", spec.cortex_name)
     info.desc().append_child_value("cortex_nominal_srate_hz", str(rate))
     add_channel_metadata(info, labels)
     return StreamOutlet(info)
+
+
+def stream_lsl_name(spec: StreamSpec, prefix: str) -> str:
+    """Return a device-specific LSL name while preserving legacy defaults."""
+    if not prefix:
+        return spec.lsl_name
+    legacy_prefix = "Epoc X"
+    if spec.lsl_name.startswith(f"{legacy_prefix} "):
+        suffix = spec.lsl_name[len(legacy_prefix):]
+        return f"{prefix}{suffix}"
+    return spec.lsl_name
 
 
 def convert_sample(values: list, channel_format: str) -> list:
@@ -194,6 +217,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="print incoming quality samples to stderr as they arrive",
     )
+    parser.add_argument(
+        "--stream-prefix",
+        default="Epoc X",
+        help="prefix for the published LSL quality stream names (default: Epoc X)",
+    )
     args = parser.parse_args()
     if not args.client_id or not args.client_secret:
         parser.error("client credentials are required via --client-id/--client-secret or EMOTIV_CLIENT_ID/EMOTIV_CLIENT_SECRET")
@@ -210,6 +238,7 @@ def config_from_args(args: argparse.Namespace) -> BridgeConfig:
         streams=tuple(args.streams),
         verify_ssl=args.verify_ssl,
         print_samples=args.print_samples,
+        stream_prefix=args.stream_prefix,
     )
 
 
@@ -374,9 +403,15 @@ def run_bridge(config: BridgeConfig) -> None:
             # retain Cortex's documented order.
             publish_labels = [label for label in labels if not (stream_name == "eeg" and label == "MARKERS")]
             rate = eeg_nominal_rate(headset) if stream_name == "eeg" else None
-            outlets[stream_name] = create_outlet(spec, publish_labels, nominal_srate=rate)
+            lsl_name = stream_lsl_name(spec, config.stream_prefix)
+            outlets[stream_name] = create_outlet(
+                spec,
+                publish_labels,
+                nominal_srate=rate,
+                lsl_name=lsl_name,
+            )
             print(
-                f"Publishing {stream_name} as LSL '{spec.lsl_name}' with columns {publish_labels!r}",
+                f"Publishing {stream_name} as LSL '{lsl_name}' with columns {publish_labels!r}",
                 file=sys.stderr,
                 flush=True,
             )

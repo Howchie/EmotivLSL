@@ -70,10 +70,14 @@ matches the Flex 1.0 specification's maximum slew of 32.64 µV/sample at
 state at the 14-bit midpoint (8192); the absolute DC offset is arbitrary for
 this AC-coupled device. `--remove-dc` emits midpoint-subtracted values.
 
-Flex 1.0 has 32 configurable sensor wires plus CMS/DRL references. Since the
-mapping is part of the Cortex headset configuration, the direct stream uses the
-stable hardware labels `LA..LQ` and `RA..RQ`. A known montage can replace these
-labels with its 10-20 positions.
+Flex 1.0 has 32 configurable sensor wires plus CMS/DRL references. The packet
+order is fixed as `LA..LQ`, then `RA..RQ`; CMS and DRL are references and are not
+included in the EEG sample vector. The direct stream loads
+`epoch_flex_electrodes.json`, which is intentionally compatible with the flat
+JSON emitted by Emotiv Launcher (including its CMS/DRL entries). It preserves
+the packet order, replaces the LSL labels with the configured locations, and
+stores the original wire label in channel metadata. Missing entries fall back
+to their wire labels, so a partial configuration cannot shift or drop data.
 
 ## Running the experimental direct stream
 
