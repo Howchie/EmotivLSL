@@ -598,6 +598,21 @@ class EmotivEpocX(EmotivBase):
                 return len(packet), observed_lengths
         return None, observed_lengths
 
+    def read_stream_report(self, hid_device):
+        """Read one report using the mode supported by the selected firmware.
+
+        The original legacy reader used hidapi's blocking ``read`` call.  Some
+        older Windows HID collections return an empty list from
+        ``read(..., timeout_ms=...)`` even though the same collection delivers
+        reports through the blocking API. Keep discovery and startup probes
+        timed, but restore the blocking read for an established legacy stream.
+        Firmware 0x740 retains the timed read so an idle headset can be
+        detected without hanging the loop.
+        """
+        if self.decryption_path == 'legacy':
+            return hid_device.read(self.READ_SIZE)
+        return hid_device.read(self.READ_SIZE, timeout_ms=1000)
+
     def open_streaming_hid_device(self):
         """Open the Emotiv interface that actually carries EEG reports.
 
@@ -861,7 +876,7 @@ class EmotivEpocX(EmotivBase):
                 publish(normalized, monitor_rate=False)
 
             while True:
-                encrypted = hid_device.read(self.READ_SIZE, timeout_ms=1000)
+                encrypted = self.read_stream_report(hid_device)
                 if not encrypted:
                     # A read timeout, not a malformed report: the headset is
                     # connected but idle.

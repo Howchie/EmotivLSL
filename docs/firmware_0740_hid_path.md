@@ -118,6 +118,11 @@ Interface discovery is firmware-independent for the same reason:
   loop. If a collection is silent during probing, its probe handle is closed
   and the preferred fallback is reopened for streaming; older firmware may
   not arm its input endpoint until that reopen.
+* The established pre-0x740 stream uses hidapi's blocking read, matching the
+  original reader. Some older Windows HID collections return empty results
+  from a timed read even when the blocking call receives EEG reports. The
+  firmware-0x740 stream continues to use timed reads so an idle headset does
+  not block startup.
 * `python main.py --list-hid` prints every HID interface the operating system
   reports, which is the first thing to check when a headset is not recognized.
 
