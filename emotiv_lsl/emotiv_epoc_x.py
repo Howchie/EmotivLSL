@@ -55,6 +55,7 @@ class EmotivEpocX(EmotivBase):
         'No Emotiv HID interface produced EEG-sized packets during probing.',
     )
     LEGACY_RETRY_SECONDS = 2.0
+    STREAM_WAIT_SECONDS = 2.0
     VERIFY_PACKET_COUNT = 12
     # EPOC X streams at either 128 or 256 Hz depending on how the headset is
     # configured, and nothing in the HID report says which.  A consumer that
@@ -292,6 +293,12 @@ class EmotivEpocX(EmotivBase):
             print(
                 'The EPOC X feature report carried no firmware marker; '
                 'assuming pre-0x740 firmware.',
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
+            print(
+                f'The EPOC X feature report says firmware 0x{parsed[0]:03x}.',
                 file=sys.stderr,
                 flush=True,
             )
@@ -607,42 +614,76 @@ class EmotivEpocX(EmotivBase):
         return None, observed_lengths
 
     def open_streaming_hid_device(self):
-        """Open the Emotiv interface that actually carries EEG reports.
+        """Open the Emotiv interface that carries EEG reports, waiting until one does.
+
+        Nothing about the session can be decided before the headset streams.
+        The key is confirmed and the rate measured against real packets.  Until
+        the current headset connects, the dongle's feature report can still
+        describe the headset it was last paired with.  Continuing with a silent
+        interface therefore locks in an unverified key and a guessed rate that
+        are wrong once packets arrive.  A missing dongle or a silent headset is
+        waited for instead, and the handle is returned open once reports flow.
+        """
+        verbose = True
+        announced = None
+        while True:
+            devices = self.get_hid_devices()
+            if devices:
+                opened = self.probe_streaming_hid_device(devices, verbose=verbose)
+                if opened is not None:
+                    return opened
+                verbose = False
+                reason = 'no Emotiv HID interface is sending data yet.'
+            else:
+                reason = self.no_device_message()
+            if reason != announced:
+                print(
+                    f'Waiting for the EPOC X headset to start streaming: {reason} '
+                    'Switch the headset on and let EMOTIV Launcher connect it; '
+                    'retrying until it sends data.',
+                    file=sys.stderr,
+                    flush=True,
+                )
+                announced = reason
+            time.sleep(self.STREAM_WAIT_SECONDS)
+
+    def probe_streaming_hid_device(self, devices: list[dict], verbose: bool = True):
+        """Probe each interface once; return ``(device, open handle)`` or None.
 
         Interfaces are tried best-guess first, and one that cannot be opened or
         stays silent never stops the remaining ones from being tried: Windows
         claims some HID collections for itself and another application may hold
-        one open.  The winning handle is returned still open so the streaming
-        loop does not have to close and reopen the collection.
+        one open.  Silent interfaces are closed.  ``verbose`` is off for repeat
+        probes while waiting, so the console is not flooded.
         """
-        devices = self.get_hid_devices()
-        if not devices:
-            raise RuntimeError(self.no_device_message())
-
-        self.print_hid_devices(devices)
+        if verbose:
+            self.print_hid_devices(devices)
         candidates = sorted(devices, key=self.probe_priority)
-        fallback = None
+        opened_any = False
 
         for device in candidates:
             hid_device = hid.device()
             try:
                 hid_device.open_path(device['path'])
             except Exception as exc:
-                print(
-                    f"Could not open Emotiv HID interface ({self.describe_hid_device(device)}): {exc}",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                if verbose:
+                    print(
+                        f"Could not open Emotiv HID interface ({self.describe_hid_device(device)}): {exc}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                 continue
+            opened_any = True
 
             try:
                 length, observed_lengths = self.probe_report_lengths(hid_device)
             except Exception as exc:
-                print(
-                    f"Emotiv HID interface ({self.describe_hid_device(device)}) failed while probing: {exc}",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                if verbose:
+                    print(
+                        f"Emotiv HID interface ({self.describe_hid_device(device)}) failed while probing: {exc}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                 hid_device.close()
                 continue
 
@@ -655,44 +696,28 @@ class EmotivEpocX(EmotivBase):
                 )
                 return device, hid_device
 
-            if observed_lengths:
+            if verbose and observed_lengths:
                 print(
                     f"Emotiv HID interface ({self.describe_hid_device(device)}) produced "
                     f"unsupported packet lengths: {sorted(observed_lengths)}",
                     file=sys.stderr,
                     flush=True,
                 )
-            else:
+            elif verbose:
                 print(
                     f"Emotiv HID interface ({self.describe_hid_device(device)}) produced "
                     "no data during probing.",
                     file=sys.stderr,
                     flush=True,
                 )
+            hid_device.close()
 
-            # Candidates are in priority order, so the first interface that
-            # opens is the best guess if nothing streams during probing.  A
-            # headset that is on but idle should not be a hard failure.
-            if fallback is None:
-                fallback = (device, hid_device)
-            else:
-                hid_device.close()
-
-        if fallback is not None:
-            device, hid_device = fallback
-            print(
-                'No Emotiv HID interface streamed during probing; continuing with '
-                f'{self.describe_hid_device(device)}. If no EEG follows, power-cycle '
-                'the headset and close any other application reading it.',
-                file=sys.stderr,
-                flush=True,
+        if not opened_any:
+            raise RuntimeError(
+                'No Emotiv HID interface could be opened. Interfaces seen: '
+                + '; '.join(self.describe_hid_device(device) for device in candidates)
             )
-            return device, hid_device
-
-        raise RuntimeError(
-            'No Emotiv HID interface could be opened. Interfaces seen: '
-            + '; '.join(self.describe_hid_device(device) for device in candidates)
-        )
+        return None
 
     def get_streaming_hid_device_info(self):
         device, hid_device = self.open_streaming_hid_device()

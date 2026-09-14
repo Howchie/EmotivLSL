@@ -132,8 +132,10 @@ silent, or misreported therefore still streams.
 
 Interface discovery is also firmware-independent: Emotiv interfaces are matched
 on the manufacturer string *or* the receiver's vendor id (Windows does not
-always report the former), the most likely EEG collection is probed first, and
-an interface that cannot be opened or stays silent no longer aborts the run.
+always report the former), and the most likely EEG collection is probed first.
+If the dongle is missing or the headset is not streaming yet, the reader waits
+and prints `Waiting for the EPOC X headset to start streaming`. The key and
+sample rate are only chosen once real packets arrive.
 
 Automatic detection does not currently stream from 0x720 headsets: the stream
 opens but carries no samples. For firmware older than 0x740, use

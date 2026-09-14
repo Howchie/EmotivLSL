@@ -132,8 +132,13 @@ Interface discovery is firmware-independent for the same reason:
   `usage == 2`, then interface number) instead of enumeration order.
 * An interface that cannot be opened - Windows claims some HID collections, and
   another application may hold one - is logged and skipped rather than raising.
-* If nothing streams during probing the best candidate is used anyway, because a
-  connected-but-idle headset is not a discovery failure.
+* If nothing streams during probing, the reader waits and probes again every two
+  seconds. It no longer continues with a silent interface. Until the current
+  headset connects, the dongle's feature report can still describe the previous
+  one. On a Windows machine that had just run a 0x720 headset, a 0x740 headset
+  started this way was assigned the legacy key and 128 Hz with zero packets
+  checked. The key is now chosen, and the rate measured, only once reports
+  arrive. The firmware number from the feature report is logged.
 * The probed handle stays open into the streaming loop, so the collection is no
   longer closed and reopened between probing and streaming.
 * `python main.py --list-hid` prints every HID interface the operating system
