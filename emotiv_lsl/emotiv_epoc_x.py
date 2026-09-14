@@ -48,6 +48,13 @@ class EmotivEpocX(EmotivBase):
     # idle/baseline report contains on every channel.
     BASELINE_SAMPLE_PAIR = (0x00, 0x80)
     FIRMWARE_MODES = ('auto', 'legacy', '0740')
+    # Exact messages the frozen legacy reader raises when the dongle is absent
+    # or the headset is not streaming yet; see wait_for_legacy_reader.
+    LEGACY_NOT_READY_ERRORS = (
+        'Emotiv Epoc X not found',
+        'No Emotiv HID interface produced EEG-sized packets during probing.',
+    )
+    LEGACY_RETRY_SECONDS = 2.0
     VERIFY_PACKET_COUNT = 12
     # EPOC X streams at either 128 or 256 Hz depending on how the headset is
     # configured, and nothing in the HID report says which.  A consumer that
@@ -776,16 +783,45 @@ class EmotivEpocX(EmotivBase):
     def log_decrypted_packet(self, writer: csv.writer, data: bytearray) -> None:
         writer.writerow(list(data))
 
+    def wait_for_legacy_reader(self) -> EmotivEpocXLegacy:
+        """Build the frozen pre-0x740 reader once the headset is streaming.
+
+        That reader raises if no dongle is enumerated, or if no interface sends
+        a report during its short probe, which is the normal state before the
+        headset is switched on or paired.  Those two failures are retried here
+        rather than crashing the EEG thread.  Anything else still propagates.
+        The reader's own outlets are only created after this returns, so an
+        LSL recorder never sees a stream appear and vanish while waiting.
+        """
+        announced = None
+        while True:
+            try:
+                reader = EmotivEpocXLegacy(
+                    emit_debug=self.emit_debug,
+                    packet_log_path=self.packet_log_path,
+                    sample_rate=self.requested_sample_rate,
+                )
+                reader.get_streaming_hid_device_info()
+                return reader
+            except Exception as exc:
+                if str(exc) not in self.LEGACY_NOT_READY_ERRORS:
+                    raise
+                if announced != str(exc):
+                    print(
+                        f'Waiting for the EPOC X headset to start streaming ({exc}). '
+                        'Switch the headset on; retrying until it sends data.',
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    announced = str(exc)
+            time.sleep(self.LEGACY_RETRY_SECONDS)
+
     def main_loop(self):
         if self.firmware_mode == 'legacy':
             # Hand the whole session to the frozen pre-0x740 reader. None of the
             # discovery, feature-report, verification or rate-measurement steps
             # below run for legacy headsets.
-            return EmotivEpocXLegacy(
-                emit_debug=self.emit_debug,
-                packet_log_path=self.packet_log_path,
-                sample_rate=self.requested_sample_rate,
-            ).main_loop()
+            return self.wait_for_legacy_reader().main_loop()
 
         log_handle = None
         log_writer = None

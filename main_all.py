@@ -1,10 +1,13 @@
 import argparse
+import sys
 import threading
 
 from emotiv_lsl.cortex_bridge import BridgeConfig, run_bridge
 from emotiv_lsl.emotiv_base import print_all_hid_interfaces
 from emotiv_lsl.emotiv_epoc_x import EmotivEpocX
 from examples.view_contact_quality import DualQualityViewer
+
+EEG_WATCHDOG_MS = 500
 
 
 def parse_args() -> argparse.Namespace:
@@ -96,7 +99,23 @@ def main() -> None:
     bridge_thread = threading.Thread(target=start_quality_bridge, args=(args,), daemon=True, name="cortex-quality")
     bridge_thread.start()
 
-    DualQualityViewer().run()
+    viewer = DualQualityViewer()
+
+    # If the EEG reader dies, close everything rather than leave the quality
+    # window and Cortex streams running without EEG. A half-alive instance also
+    # keeps its quality streams on the network, where a relaunched viewer can
+    # latch onto them. The thread's traceback has already been printed.
+    def close_if_eeg_stopped() -> None:
+        if eeg_thread.is_alive():
+            viewer.root.after(EEG_WATCHDOG_MS, close_if_eeg_stopped)
+            return
+        print("The EPOC X EEG reader stopped; closing.", file=sys.stderr, flush=True)
+        viewer.root.destroy()
+
+    viewer.root.after(EEG_WATCHDOG_MS, close_if_eeg_stopped)
+    viewer.run()
+    if not eeg_thread.is_alive():
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

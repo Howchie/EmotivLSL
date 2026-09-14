@@ -109,7 +109,12 @@ enumeration order. It closes the probed handle and reopens it, takes the key
 from the serial number, and publishes every 32-byte report. It never queries
 the feature report, verifies the key, measures the rate or filters packets.
 The only change from the original is that its outlets declare
-`--sample-rate` when one is given, and `config.SRATE` otherwise.
+`--sample-rate` when one is given, and `config.SRATE` otherwise. The original
+reader raised an error if no dongle was found or the headset sent nothing during
+its probe. `EmotivEpocX.wait_for_legacy_reader` now catches those two errors
+and retries every two seconds until the headset streams. The outlets are only
+created once it does. In `main_all.py`, if the EEG reader thread dies, the
+whole launcher closes and exits with code 1.
 
 Automatic detection does not currently stream from a 0x720 headset. The
 reader opens the stream, but it contains no samples and the rate measurement
