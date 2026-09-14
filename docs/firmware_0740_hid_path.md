@@ -189,6 +189,14 @@ LSL stream. The legacy reader publishes it too. Its counter fields use the
 one-second range for the configured EEG rate (0..127 at 128 Hz or 0..255 at
 256 Hz).
 
+The counter cannot see whole cycles lost in a dropout. For a gap in arrival
+time longer than half a cycle, the tracker adds whole cycles from arrival time
+and sets `RESET_FLAG` to mark `MISSING_REPORTS` as an estimate. The last column,
+`FILLED`, is shared with the Flex stream, which publishes stand-ins for lost
+samples. EPOC X does not fill, so it is always 0 here. EPOC X timestamps
+remain arrival times. Its repeats arrive as extras rather than taking a slot,
+and no arrival delay building up in whole periods has been seen on EPOC X.
+
 On firmware 0x720, a 128 Hz capture (`data/legacy_packets.csv`) confirms the
 counter format. It holds 10,032 reports, all EEG (byte 1 is always `0x10`).
 The counter steps by one and wraps 127 → 0, with no missing reports. It does

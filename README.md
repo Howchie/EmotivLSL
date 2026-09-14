@@ -244,9 +244,19 @@ caveats are in
 
 The direct reader also publishes an always-on `Epoc Flex 1.0 Packet Diagnostics`
 LSL stream beside the EEG outlet. It contains the 7-bit packet counter,
-expected counter, per-sample gap/reset flags, and cumulative missing-report
-counts. The Flex ADC accumulator is carried across gaps by default; use
-`--reset-on-gap` only to reproduce the legacy midpoint-reset behavior.
+expected counter, per-sample gap/reset flags, cumulative missing-report counts
+and a `FILLED` flag. The Flex ADC accumulator is carried across gaps by
+default; use `--reset-on-gap` only to reproduce the legacy midpoint-reset
+behavior.
+
+Flex EEG is timestamped from the headset's sample counter, not arrival time. The
+dongle otherwise delivers samples 0–70 ms late, by a varying amount. Every lost
+sample is published as a filled stand-in (`FILLED = 1`), so sample number
+matches headset time. A lost report's delta is unknown, so a filled sample
+holds each channel's level. After a dropout longer than half a second,
+`RESET_FLAG` marks the missing count as an estimate, and publishing pauses for
+1 s while the clock resynchronises. See
+[`docs/flex_1_hid_path.md`](docs/flex_1_hid_path.md#timestamps-and-lost-samples).
 
 To launch Flex EEG and the unlicensed Cortex quality streams together:
 
@@ -347,10 +357,13 @@ Diagnostics` stream. Counter discontinuities are also summarized on the console
 is visible without an LSL consumer attached. The diagnostics stream is timestamped alongside the EEG
 samples and includes the decrypted packet counter (0..127 at 128 Hz or
 0..255 at 256 Hz), expected counter,
-per-sample gap/reset flags, and cumulative loss/reset counts. A gap flag marks
-the first received sample after a counter discontinuity; it does not alter the
-EEG values. Use those fields to mark or reject short acquisition windows in
-analysis.
+per-sample gap/reset flags, cumulative loss/reset counts, and a `FILLED` flag.
+`FILLED` is always 0 on EPOC X, which does not fill lost samples. A gap flag
+marks the first received sample after a counter discontinuity; it does not alter
+the EEG values. After a dropout longer than half a second, the missing count
+includes whole counter cycles estimated from arrival time, and `RESET_FLAG`
+marks it as an estimate. Use those fields to mark or reject short acquisition
+windows in analysis.
 
 The decrypted packet also contains four non-EEG bytes that are not exposed by
 default. To inspect whether they carry useful quality information without
@@ -383,9 +396,10 @@ instead of calling it contact quality.
 
 The Flex launcher similarly publishes `Epoc Flex 1.0 Packet Diagnostics` beside
 the 32-channel EEG stream. Flex uses a 7-bit wrapping counter and the same
-diagnostic channel names. Its ADC accumulator is carried across packet gaps by
-default; pass `--reset-on-gap` only when reproducing the legacy midpoint-reset
-behavior.
+diagnostic channel names. Unlike EPOC X, it fills lost samples (`FILLED = 1`)
+and timestamps from the counter. Its ADC accumulator is carried across packet
+gaps by default; pass `--reset-on-gap` only when reproducing the legacy
+midpoint-reset behavior.
 
 ### Examples
 

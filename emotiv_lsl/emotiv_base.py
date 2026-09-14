@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import math
 import sys
 import time
 
@@ -14,9 +15,19 @@ PACKET_DIAGNOSTIC_CHANNELS = (
     ("GAP_FLAG", "boolean", "One or more packet counters were skipped or duplicated."),
     ("MISSING_REPORTS", "count", "Estimated reports missing immediately before this report."),
     ("CUMULATIVE_MISSING", "count", "Estimated missing reports since this reader started."),
-    ("RESET_FLAG", "boolean", "Packet counter restarted without a normal modulo wrap."),
+    (
+        "RESET_FLAG",
+        "boolean",
+        "Counter continuity was lost: the counter restarted, or a dropout lasted over half a "
+        "counter cycle, so MISSING_REPORTS is estimated from arrival time.",
+    ),
     ("CUMULATIVE_GAPS", "count", "Counter discontinuity events since this reader started."),
-    ("CUMULATIVE_RESETS", "count", "Counter restart events since this reader started."),
+    ("CUMULATIVE_RESETS", "count", "Counter continuity losses since this reader started."),
+    (
+        "FILLED",
+        "boolean",
+        "This sample was not received; the reader inserted it in place of a lost report.",
+    ),
 )
 
 
@@ -34,6 +45,8 @@ class PacketDiagnostics:
     cumulative_resets: int
     # Console-only: this report was a dropped repeat, not a published sample.
     repeat: bool = False
+    # Published: the sample stands in for a lost report.
+    filled: bool = False
 
     @property
     def flag_from_dropped_repeat(self) -> bool:
@@ -58,7 +71,25 @@ class PacketDiagnostics:
             float(self.reset),
             float(self.cumulative_gaps),
             float(self.cumulative_resets),
+            float(self.filled),
         ]
+
+    def filled_sample(self, counter: int) -> PacketDiagnostics:
+        """Diagnostics for a sample inserted in place of a lost report.
+
+        The report after the loss carries GAP_FLAG and MISSING_REPORTS; filled
+        rows only mark themselves, with the counter the lost report would have had.
+        """
+        return replace(
+            self,
+            counter=counter,
+            expected_counter=counter,
+            gap=False,
+            missing_reports=0,
+            reset=False,
+            repeat=False,
+            filled=True,
+        )
 
 
 class PacketCounterTracker:
@@ -91,7 +122,21 @@ class PacketCounterTracker:
         self._flag_next_sample = True
         return diagnostics
 
-    def update(self, counter: int, *, reset_hint: bool = False) -> PacketDiagnostics:
+    def update(
+        self,
+        counter: int,
+        *,
+        reset_hint: bool = False,
+        elapsed_periods: float | None = None,
+    ) -> PacketDiagnostics:
+        """Account for one received report.
+
+        ``elapsed_periods`` is the arrival time since the previous report, in
+        sample periods.  The counter alone cannot see whole cycles lost in a
+        dropout, so when it is given, whole cycles are added from arrival time.
+        A gap longer than half a cycle is also flagged as a continuity loss
+        (RESET_FLAG), because arrival jitter makes that count an estimate.
+        """
         counter = int(counter)
         if not 0 <= counter < self.modulus:
             raise ValueError(
@@ -107,9 +152,19 @@ class PacketCounterTracker:
             expected = (self.last_counter + 1) % self.modulus
             delta = (counter - self.last_counter) % self.modulus
             reset = bool(reset_hint and counter != expected)
+            long_dropout = elapsed_periods is not None and elapsed_periods > self.modulus / 2
             if reset:
                 gap = False
                 missing = 0
+                self.cumulative_resets += 1
+            elif long_dropout:
+                wraps = max(0, round((elapsed_periods - delta) / self.modulus))
+                steps = delta + wraps * self.modulus
+                gap = True
+                reset = True
+                missing = max(0, steps - 1)
+                self.cumulative_gaps += 1
+                self.cumulative_missing += missing
                 self.cumulative_resets += 1
             else:
                 gap = delta != 1
@@ -161,6 +216,141 @@ class RepeatedReportFilter:
         return repeat
 
 
+class CounterClock:
+    """Timestamp samples by their place in the headset's sample sequence.
+
+    A dongle can deliver reports late by a varying number of whole sample
+    periods.  A Flex 1.0 dongle resends a report when the next one is late,
+    and every later report then arrives one period behind until the dongle
+    discards a block of 8 samples to catch up.  Arrival time is therefore off
+    by 0-70 ms in steps of one period.  The counter is not: the headset
+    samples at a steady rate.
+
+    The clock turns the unwrapped counter index into a timestamp:
+
+    * Arrivals fall on the same phase within the sample period, whatever the
+      backlog, so a phase-locked loop on each arrival's error, wrapped into one
+      period, tracks the headset's period and phase on the PC clock.
+    * The lowest whole-period backlog level seen is taken as zero backlog; a
+      lower one moves the clock back by whole periods.  Until the dongle's
+      first catch-up after start, timestamps can be late by the backlog the
+      session started with.
+    * After a long dropout the dongle first dumps queued, old reports, so the
+      first arrivals do not show the delay floor.  Stamps are held for
+      ``RESTART_HOLD_SECONDS``, then the phase and floor are taken from the
+      held arrivals and applied backwards.
+    * Stamps always increase.  Filled samples are spaced evenly between the
+      stamps of the received samples on either side.
+
+    Offline replay of two bench recordings put these stamps within +/-0.1 ms
+    of a whole-recording fit once the delay floor was known.
+    """
+
+    LOOP_TIME_CONSTANT_SECONDS = 10.0
+    PHASE_CLIP_PERIODS = 0.25
+    SLEW_PERIODS = 0.9
+    RESTART_HOLD_SECONDS = 1.0
+
+    def __init__(self, nominal_rate: float) -> None:
+        self.period = 1.0 / float(nominal_rate)
+        loop_samples = self.LOOP_TIME_CONSTANT_SECONDS * float(nominal_rate)
+        self._kp = 2.0 / loop_samples
+        self._ki = self._kp ** 2 / 4.0
+        self._index: int | None = None
+        self._phase = 0.0            # zero-backlog arrival time of index 0
+        self._last_index: int | None = None
+        self._last_stamp: float | None = None
+        self._held: list[tuple[int, float, int]] = []
+        self._hold_until: float | None = None
+        self._ready: list[float] = []
+
+    @property
+    def holding(self) -> bool:
+        return self._hold_until is not None
+
+    def add(self, arrival: float, missing: int = 0, *, restart: bool = False, fill: bool = True) -> None:
+        """Register a received report that follows ``missing`` lost ones.
+
+        ``fill`` says whether a stamp is wanted for each lost report as well.
+        """
+        arrival = float(arrival)
+        first = self._index is None
+        self._index = 0 if first else self._index + int(missing) + 1
+        slots = 1 if first or not fill else int(missing) + 1
+        if self.holding and (restart or arrival >= self._hold_until):
+            self._release_hold()
+        if first:
+            self._phase = arrival
+            self._emit(self._index, arrival, slots)
+        elif restart:
+            self._held = [(self._index, arrival, slots)]
+            self._hold_until = arrival + self.RESTART_HOLD_SECONDS
+        elif self.holding:
+            self._held.append((self._index, arrival, slots))
+        else:
+            self._track(self._index, arrival)
+            self._emit(self._index, self._clamped(self._phase + self._index * self.period), slots)
+
+    def take_ready(self) -> list[float]:
+        """Stamps finalized since the last call, one per slot, in order."""
+        ready, self._ready = self._ready, []
+        return ready
+
+    def flush(self) -> None:
+        """Finalize held stamps, e.g. when the stream stops during a hold."""
+        if self.holding:
+            self._release_hold()
+
+    def _track(self, index: int, arrival: float) -> None:
+        error = arrival - (self._phase + index * self.period)
+        level = math.floor(error / self.period + 0.5)
+        if level < 0:
+            self._phase += level * self.period
+        clip = self.PHASE_CLIP_PERIODS * self.period
+        wrapped = min(max(error - level * self.period, -clip), clip)
+        self._phase += self._kp * wrapped
+        self.period += self._ki * wrapped
+
+    def _clamped(self, target: float) -> float:
+        steps = self._index - self._last_index
+        base = self._last_stamp + steps * self.period
+        slack = self.SLEW_PERIODS * self.period
+        return min(max(target, base - slack), base + slack)
+
+    def _release_hold(self) -> None:
+        held, self._held, self._hold_until = self._held, [], None
+        # Phase from the circular mean of the held arrivals, floor from their
+        # lowest whole-period level.  Dumped old reports sit on higher levels.
+        residuals = [arrival - index * self.period for index, arrival, _ in held]
+        angle = sum(complex(math.cos(2 * math.pi * r / self.period), math.sin(2 * math.pi * r / self.period))
+                    for r in residuals)
+        phase = math.atan2(angle.imag, angle.real) / (2 * math.pi) * self.period
+        lowest = min(math.floor((r - phase) / self.period + 0.5) for r in residuals)
+        self._phase = phase + lowest * self.period
+        for index, _, slots in held:
+            stamp = self._phase + index * self.period
+            minimum = self._last_stamp + 0.1 * self.period * slots
+            self._emit(index, max(stamp, minimum), slots)
+
+    def _emit(self, index: int, stamp: float, slots: int) -> None:
+        if self._last_stamp is not None and slots > 1:
+            step = (stamp - self._last_stamp) / slots
+            self._ready.extend(self._last_stamp + step * i for i in range(1, slots))
+        self._ready.append(stamp)
+        self._last_index = index
+        self._last_stamp = stamp
+
+
+def declare_can_drop_samples(info: StreamInfo) -> None:
+    """Tell XDF readers the timestamps already account for lost samples.
+
+    pyxdf otherwise replaces a stream's timestamps with a straight-line fit
+    over sample number, which would undo the reader's own timestamps.
+    """
+
+    info.desc().append_child("synchronization").append_child_value("can_drop_samples", "true")
+
+
 class PacketLossReporter:
     """Rate-limited console summary of packet-counter discontinuities.
 
@@ -179,6 +369,13 @@ class PacketLossReporter:
         print(f"{self.label}: {message}", file=sys.stderr, flush=True)
 
     def report(self, diagnostics: PacketDiagnostics) -> None:
+        if diagnostics.reset and diagnostics.missing_reports:
+            self._emit(
+                f"dropout: about {diagnostics.missing_reports} report(s) missing before counter "
+                f"{diagnostics.counter} (estimated from arrival time); "
+                f"{diagnostics.cumulative_missing} missing report(s) so far"
+            )
+            return
         if diagnostics.reset:
             self._emit(
                 f"packet counter restarted at {diagnostics.counter} "
@@ -276,6 +473,7 @@ def make_packet_diagnostics_stream_info(
     name: str,
     nominal_srate: float,
     counter_modulus: int,
+    can_drop_samples: bool = False,
 ) -> StreamInfo:
     """Build the stable metadata for a packet diagnostics LSL stream."""
 
@@ -298,6 +496,8 @@ def make_packet_diagnostics_stream_info(
         channel.append_child_value("unit", unit)
         channel.append_child_value("type", "PacketDiagnostic")
         channel.append_child_value("description", description)
+    if can_drop_samples:
+        declare_can_drop_samples(info)
     return info
 
 

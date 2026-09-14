@@ -164,8 +164,8 @@ the diagnostics stream to mark the gap and reject a short window around it; only
 interpolate if that is appropriate for the specific downstream method. The
 diagnostics stream is 128 Hz and has the channels `COUNTER`,
 `EXPECTED_COUNTER`, `GAP_FLAG`, `MISSING_REPORTS`, `CUMULATIVE_MISSING`,
-`RESET_FLAG`, `CUMULATIVE_GAPS`, and `CUMULATIVE_RESETS`, timestamped with the
-corresponding EEG sample. The same events are summarized on stderr - the first
+`RESET_FLAG`, `CUMULATIVE_GAPS`, `CUMULATIVE_RESETS`, and `FILLED`, one row per
+EEG sample with the same timestamp. The same events are summarized on stderr - the first
 one immediately, then at most once every ten seconds - so packet loss is visible
 in the console without an LSL consumer attached.
 
@@ -191,17 +191,81 @@ counters 17 and 18 both have every channel at the maximum slew (+63 or −64), a
 floating or saturated wires produce. Their counters and metadata bytes differ,
 so the whole-report comparison keeps both.
 
-Flex timing differs from the EPOC X. There, a repeat is squeezed in as an
-extra report. On Flex, the dongle's reports stay evenly spaced when counted by
-report, and the counter is what jumps. In the 60 s recording, each repeat took
-a normal slot, so the headset's samples ran one period late after it. The
-counter also jumped 121 → 1 (7 reports) with no gap in arrival time. Counted
-per report and per counter, the rates agree over the recording (127.985 vs
-127.984 Hz): the 8 inserted copies were roughly offset by 7 dropped samples.
-That suggests the dongle keeps a fixed output clock, pads with a copy when a
-radio packet is late, and later discards the backlog. It is an inference from
-timing, not a confirmed mechanism. Either way, such a loss leaves no gap in the
-LSL timestamps. Only `MISSING_REPORTS` and `CUMULATIVE_MISSING` show it.
+On Flex, a repeat also delays every later report by one sample period. See
+"Timestamps and lost samples" below.
+
+### Timestamps and lost samples
+
+**Why arrival time is wrong.** Timestamping each sample when its report
+arrives, as the reader used to, puts it tens of milliseconds late and by a
+varying amount. The Flex dongle sends reports on its own steady schedule. When
+a report from the headset is late, the dongle resends the previous one, and
+every later report then arrives one sample period behind. Periodically the
+dongle catches up by discarding a block of 8 samples, often with almost no gap
+in arrival time.
+
+A 4-minute bench recording with deliberate obstructions shows this. With
+the headset's rate held fixed, every change in delay was a whole number of
+sample periods, within 0.14 of a period:
+
+* each repeat added exactly one period;
+* the losses were almost all exactly 8 or 16 samples;
+* several 8-sample losses brought the delay straight back to its floor.
+
+In the first 78 s, arrival times lagged the headset's sample clock by a median
+of 23 ms (99th percentile 56 ms, maximum 69 ms). On the PC clock, the headset
+rate was 127.987 Hz (−103 ppm), consistent to ±4 ppm across three separate
+stretches. The metadata bytes carry no usable clock either. Bytes 30–31
+cycle through 8 status slots, one per sample in each radio block. One slot
+counts steadily, but it restarts after a dropout, so it cannot measure one.
+
+**Counter clock.** The reader therefore timestamps each sample by its place in
+the headset's sample sequence (`CounterClock` in `emotiv_base.py`):
+
+* Because the delay moves in whole periods, arrivals keep the same phase within
+  a period. A phase-locked loop on the arrival error, wrapped into one period,
+  tracks the headset's period and phase. The phase estimate uses every sample,
+  not just the rare minimum-delay ones.
+* The lowest whole-period delay seen is taken as zero backlog. Until the
+  dongle's first catch-up after starting, timestamps can be late by the backlog
+  the session began with (15–31 ms in the two recordings).
+* After a dropout of more than half a second, the dongle first dumps queued old
+  reports about 1 ms apart. The clock holds samples for 1 s, takes the phase and
+  floor from those arrivals, and applies them backwards. Publishing is delayed
+  by that second once per long dropout.
+* Timestamps always increase.
+
+The bench recordings were replayed through the reader, rebuilt from their
+counters and deltas with their original arrival times. Against an offline fit
+over the whole recording, timestamps agreed to within ±0.1 ms (98% of samples)
+once the delay floor had been seen, including after all four long dropouts.
+The old arrival timestamps were off by a median of 31 ms.
+
+**Filling lost samples.** Like Cortex's `INTERPOLATED` column, the reader
+publishes a stand-in sample for every lost report and flags it with
+`FILLED = 1`. Sample number then matches headset time, so tools that ignore
+timestamps and assume a fixed rate stay aligned. A lost report's delta is
+unknown, so a filled sample applies a zero delta: every channel holds its level
+and decays with the DC restore. The report after the loss carries `GAP_FLAG`
+and `MISSING_REPORTS`, then applies its own delta. Losses longer than 60 s
+(`FILL_LIMIT_SECONDS`) are not filled.
+
+**Long dropouts.** The 7-bit counter cannot see whole cycles lost in a dropout.
+The diagnostics used to undercount them: the 4-minute recording reported 581
+missing reports instead of about 4,900. For a gap longer than half a cycle,
+whole cycles are now added from arrival time, and `RESET_FLAG` marks the count
+as an estimate. The estimate cannot be exact. For the four long dropouts in the
+recording, the counter and arrival time disagreed by 4–44 samples. Either the
+counter does not advance steadily through a dropout, or the dongle comes back
+with a different delay. Reject a window around every `RESET_FLAG` in analysis.
+
+**XDF loading.** Both Flex streams declare
+`<synchronization><can_drop_samples>true</can_drop_samples></synchronization>`.
+pyxdf (1.17+) then keeps their timestamps rather than refitting them over sample
+number. Other loaders that do not honour the flag still see evenly
+spaced, gap-free samples, because lost samples are filled.
+
+### Replay check
 
 ### Replay check
 

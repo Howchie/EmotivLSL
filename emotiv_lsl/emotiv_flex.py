@@ -21,18 +21,22 @@ from __future__ import annotations
 
 import math
 import sys
+from collections import deque
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import hid
 from Crypto.Cipher import AES
 from pylsl import StreamInfo, StreamOutlet, local_clock
 
 from emotiv_lsl.emotiv_base import (
+    CounterClock,
     EmotivBase,
     PacketCounterTracker,
     PacketDiagnostics,
     PacketLossReporter,
     RepeatedReportFilter,
+    declare_can_drop_samples,
     make_packet_diagnostics_stream_info,
 )
 
@@ -43,6 +47,16 @@ from emotiv_lsl.emotiv_base import (
 # integrator bounds all of them and reproduces the device's documented
 # 0.16-43 Hz passband (the 43 Hz roll-off is already in the analogue chain).
 DEFAULT_DC_RESTORE_HZ = 0.16
+
+
+@dataclass(frozen=True)
+class DecodedReport:
+    """One received report and the filled samples that stand in for lost ones before it."""
+
+    fills: list[list[float]]
+    fill_diagnostics: list[PacketDiagnostics]
+    sample: list[float]
+    diagnostics: PacketDiagnostics
 
 
 class EmotivFlex(EmotivBase):
@@ -58,6 +72,8 @@ class EmotivFlex(EmotivBase):
     EEG_PRODUCT_MARKER = "eeg signals"
     PACKET_COUNTER_MODULUS = 1 << 7
     PACKET_DIAGNOSTICS_NAME = "Epoc Flex 1.0 Packet Diagnostics"
+    # Longer losses are not filled: the reader assumes the headset was off.
+    FILL_LIMIT_SECONDS = 60.0
 
     # The controller uses A-H and J-Q on each side (I is the reference slot).
     CH_NAMES = (
@@ -255,13 +271,38 @@ class EmotivFlex(EmotivBase):
         return diagnostics
 
     def decode_plaintext(self, plaintext: bytes) -> list[float]:
+        return self.decode_report(plaintext).sample
+
+    def decode_report(self, plaintext: bytes, elapsed_periods: float | None = None) -> DecodedReport:
+        """Decode one received report, plus a filled sample per lost report before it.
+
+        A lost report's delta is unknown, so each filled sample applies a zero
+        delta: the accumulator holds its level and decays with the DC restore,
+        exactly as if the report had carried no change.  The report after the
+        loss then applies its own delta.  Losses longer than
+        ``FILL_LIMIT_SECONDS`` are decayed the same way but not filled.
+        """
         counter = plaintext[0] & 0x7F
-        diagnostics = self._packet_tracker.update(counter)
+        previous_counter = self._last_counter
+        diagnostics = self._packet_tracker.update(counter, elapsed_periods=elapsed_periods)
         self._last_packet_diagnostics = diagnostics
         self.packet_gaps = diagnostics.cumulative_gaps
         self.missing_reports = diagnostics.cumulative_missing
         self.packet_resets = diagnostics.cumulative_resets
         self._last_counter = counter
+
+        fills: list[list[float]] = []
+        fill_diagnostics: list[PacketDiagnostics] = []
+        missing = diagnostics.missing_reports
+        if missing and missing <= self.FILL_LIMIT_SECONDS * self.SAMPLE_RATE:
+            for offset in range(1, missing + 1):
+                self._decay(1)
+                fills.append(self._output())
+                fill_diagnostics.append(
+                    diagnostics.filled_sample((previous_counter + offset) % self.PACKET_COUNTER_MODULUS)
+                )
+        elif missing:
+            self._decay(missing)
 
         if diagnostics.gap and self.reset_on_gap and not diagnostics.flag_from_dropped_repeat:
             # Retained as an explicit compatibility option.  The default is
@@ -277,6 +318,17 @@ class EmotivFlex(EmotivBase):
                 0.0, min(float(self.ADC_MAX), self.ADC_MIDPOINT + centered)
             )
 
+        return DecodedReport(fills, fill_diagnostics, self._output(), diagnostics)
+
+    def _decay(self, samples: int) -> None:
+        """Apply ``samples`` zero-delta steps of the DC restore."""
+        factor = self._leak ** samples
+        self._adc = [
+            self.ADC_MIDPOINT + (value - self.ADC_MIDPOINT) * factor
+            for value in self._adc
+        ]
+
+    def _output(self) -> list[float]:
         if self.remove_dc:
             return [
                 (value - self.ADC_MIDPOINT) * self.LSB_UV
@@ -312,6 +364,11 @@ class EmotivFlex(EmotivBase):
         cap.append_child_value("dc_restore_hz", str(self.dc_restore_hz))
         for reference, location in sorted(self.references.items()):
             cap.append_child_value(reference.lower(), location)
+        info.desc().append_child_value(
+            "timestamps",
+            "headset counter clock; lost samples filled (see FILLED in the diagnostics stream)",
+        )
+        declare_can_drop_samples(info)
         return info
 
     def get_packet_diagnostics_stream_info(self) -> StreamInfo:
@@ -319,6 +376,7 @@ class EmotivFlex(EmotivBase):
             self.PACKET_DIAGNOSTICS_NAME,
             self.SAMPLE_RATE,
             self.PACKET_COUNTER_MODULUS,
+            can_drop_samples=True,
         )
 
     def get_packet_diagnostics_sample(self) -> list[float]:
@@ -340,11 +398,18 @@ class EmotivFlex(EmotivBase):
             flush=True,
         )
 
+        # Samples wait here until the counter clock has stamped them; after a
+        # long dropout that takes CounterClock.RESTART_HOLD_SECONDS.
+        clock = CounterClock(self.SAMPLE_RATE)
+        pending: deque[tuple[list[float], list[float]]] = deque()
+        last_arrival: float | None = None
+
         try:
             while True:
                 packet = hid_device.read(self.READ_SIZE, timeout_ms=1000)
                 if not self.validate_data(packet):
                     continue
+                arrival = local_clock()
                 plaintext = self.decrypt_data(packet)
                 # A byte-identical copy of the previous report must not be
                 # published: it would add a fake sample and apply the same
@@ -352,13 +417,24 @@ class EmotivFlex(EmotivBase):
                 if self._repeats.is_repeat(plaintext):
                     loss_reporter.report(self.skip_repeated_report(plaintext))
                     continue
-                decoded = self.decode_plaintext(plaintext)
-                loss_reporter.report(self._last_packet_diagnostics)
-                timestamp = local_clock()
-                outlet.push_sample(decoded, timestamp=timestamp)
-                diagnostics_outlet.push_sample(
-                    self.get_packet_diagnostics_sample(),
-                    timestamp=timestamp,
+                elapsed = None if last_arrival is None else (arrival - last_arrival) / clock.period
+                last_arrival = arrival
+                report = self.decode_report(plaintext, elapsed)
+                loss_reporter.report(report.diagnostics)
+
+                for values, diagnostics in zip(report.fills, report.fill_diagnostics):
+                    pending.append((values, diagnostics.as_lsl_sample()))
+                pending.append((report.sample, report.diagnostics.as_lsl_sample()))
+                missing = report.diagnostics.missing_reports
+                clock.add(
+                    arrival,
+                    missing,
+                    restart=report.diagnostics.reset,
+                    fill=len(report.fills) == missing,
                 )
+                for timestamp in clock.take_ready():
+                    values, diagnostics_sample = pending.popleft()
+                    outlet.push_sample(values, timestamp=timestamp)
+                    diagnostics_outlet.push_sample(diagnostics_sample, timestamp=timestamp)
         finally:
             hid_device.close()

@@ -762,10 +762,15 @@ class EmotivEpocX(EmotivBase):
         self.packet_resets = diagnostics.cumulative_resets
         return diagnostics
 
-    def _update_packet_diagnostics(self, data: bytearray) -> PacketDiagnostics:
+    def _update_packet_diagnostics(
+        self,
+        data: bytearray,
+        elapsed_periods: float | None = None,
+    ) -> PacketDiagnostics:
         diagnostics = self._packet_tracker.update(
             int(data[0]),
             reset_hint=self._looks_like_counter_reset(data),
+            elapsed_periods=elapsed_periods,
         )
         self._last_packet_diagnostics = diagnostics
         self.packet_gaps = diagnostics.cumulative_gaps
@@ -882,6 +887,7 @@ class EmotivEpocX(EmotivBase):
         loss_reporter = PacketLossReporter('Epoc X')
         rate_monitor = SampleRateMonitor('Epoc X', self.sample_rate)
         print(f"Streaming from {self.describe_hid_device(device)}", file=sys.stderr, flush=True)
+        last_live_timestamp: list[float | None] = [None]
 
         def publish(normalized, *, monitor_rate: bool = True) -> None:
             nonlocal logged_packets
@@ -909,9 +915,17 @@ class EmotivEpocX(EmotivBase):
             # 195 Hz for a 128 Hz headset.
             if monitor_rate:
                 rate_monitor.observe()
-            diagnostics = self._update_packet_diagnostics(decrypted)
-            loss_reporter.report(diagnostics)
             timestamp = local_clock()
+            # Arrival spacing counts whole counter cycles lost in a dropout.
+            # Startup packets were read earlier, so they have no arrival time.
+            # The counter runs over one second, so its modulus is samples per second.
+            elapsed_periods = None
+            if monitor_rate and last_live_timestamp[0] is not None:
+                elapsed_periods = (timestamp - last_live_timestamp[0]) * self.PACKET_COUNTER_MODULUS
+            if monitor_rate:
+                last_live_timestamp[0] = timestamp
+            diagnostics = self._update_packet_diagnostics(decrypted, elapsed_periods)
+            loss_reporter.report(diagnostics)
             eeg_outlet.push_sample(
                 self.decode_eeg_sample(decrypted),
                 timestamp=timestamp,

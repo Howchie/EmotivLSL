@@ -243,8 +243,13 @@ class EmotivEpocXLegacy(EmotivBase):
     def log_decrypted_packet(self, writer: csv.writer, data: bytearray) -> None:
         writer.writerow(list(data))
 
-    def track_packet(self, counter: int) -> PacketDiagnostics:
-        """Update packet-loss accounting; never let it interrupt the EEG stream."""
+    def track_packet(self, counter: int, elapsed_seconds: float | None = None) -> PacketDiagnostics:
+        """Update packet-loss accounting; never let it interrupt the EEG stream.
+
+        ``elapsed_seconds`` since the previous report lets the tracker count
+        whole counter cycles lost in a dropout.  The counter runs over one second,
+        so its modulus is the number of samples per second.
+        """
         if counter >= self.packet_tracker.modulus:
             # A counter past 127 means the headset is at 256 Hz but the stream
             # declares a lower rate, which rescales every frequency downstream.
@@ -256,7 +261,8 @@ class EmotivEpocXLegacy(EmotivBase):
                 flush=True,
             )
             self.packet_tracker = PacketCounterTracker(self.COUNTER_MODULUS_256HZ)
-        return self.packet_tracker.update(counter)
+        elapsed_periods = None if elapsed_seconds is None else elapsed_seconds * self.packet_tracker.modulus
+        return self.packet_tracker.update(counter, elapsed_periods=elapsed_periods)
 
     def main_loop(self):
         eeg_outlet = StreamOutlet(self.get_stream_info())
@@ -284,6 +290,7 @@ class EmotivEpocXLegacy(EmotivBase):
         hid_device = hid.device()
         hid_device.open_path(device['path'])
         print(f"Streaming from {self.describe_hid_device(device)}", file=sys.stderr, flush=True)
+        last_timestamp: float | None = None
 
         try:
             while True:
@@ -316,8 +323,10 @@ class EmotivEpocXLegacy(EmotivBase):
                     loss_reporter.report(self.packet_tracker.skip_repeat(decrypted[0]))
                     continue
 
-                diagnostics = self.track_packet(decrypted[0])
                 timestamp = local_clock()
+                elapsed = None if last_timestamp is None else timestamp - last_timestamp
+                last_timestamp = timestamp
+                diagnostics = self.track_packet(decrypted[0], elapsed)
                 eeg_outlet.push_sample(self.decode_eeg_sample(decrypted), timestamp)
                 diagnostics_outlet.push_sample(diagnostics.as_lsl_sample(), timestamp)
                 loss_reporter.report(diagnostics)
