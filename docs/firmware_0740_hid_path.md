@@ -108,8 +108,10 @@ matches interfaces on `manufacturer_string == 'Emotiv'` and probes them in
 enumeration order. It closes the probed handle and reopens it, takes the key
 from the serial number, and publishes every 32-byte report. It never queries
 the feature report, verifies the key, measures the rate or filters packets.
-The only change from the original is that its outlets declare
-`--sample-rate` when one is given, and `config.SRATE` otherwise. The original
+Its HID reads and decryption are unchanged from the original. Two things were
+added after decryption. Its outlets declare `--sample-rate` when one is given,
+and `config.SRATE` otherwise. It also publishes the packet diagnostics stream
+described below. The original
 reader raised an error if no dongle was found or the headset sent nothing during
 its probe. `EmotivEpocX.wait_for_legacy_reader` now catches those two errors
 and retries every two seconds until the headset streams. The outlets are only
@@ -178,8 +180,19 @@ stream rather than importing the constant.
 ## Packet diagnostics
 
 Each decoded report is also mirrored to an always-on `Epoc X Packet Diagnostics`
-LSL stream. Its counter fields use the one-second range for the configured EEG
-rate (0..127 at 128 Hz or 0..255 at 256 Hz) and identify skipped or duplicated reports;
+LSL stream. The legacy reader publishes it too. Its counter fields use the
+one-second range for the configured EEG rate (0..127 at 128 Hz or 0..255 at
+256 Hz).
+
+On firmware 0x720, a 128 Hz capture (`data/legacy_packets.csv`) confirms the
+counter format. It holds 10,032 reports, all EEG (byte 1 is always `0x10`).
+The counter steps by one and wraps 127 → 0, with no missing reports. It does
+contain 5 byte-identical repeats, which are flagged as duplicates. 256 Hz has
+not been captured on 0x720. If the legacy reader sees a counter above 127
+while declaring 128 Hz, it warns that `--sample-rate 256` is needed and
+switches to a 0..255 counter instead of failing.
+
+The counter fields identify skipped or duplicated reports;
 the captured baseline packet used when a session restarts is reported with
 `RESET_FLAG` instead of being counted as packet loss. That baseline report is
 `00 10` followed by the byte pair `00 80` on every channel - the ADC midpoint,

@@ -6,8 +6,14 @@ through the shared discovery, feature-report, key-verification or
 rate-measurement code in ``emotiv_epoc_x.py``.  Keep it separate so a change
 made for newer firmware cannot break older headsets again.
 
-The only change from 9944584 is that the outlets declare ``sample_rate``
-when one is given.  Otherwise they declare ``config.SRATE``, as before.
+Device discovery, HID reads and decryption are unchanged from 9944584.  The
+additions only work on packets after they are decrypted:
+
+* The outlets declare ``sample_rate`` when one is given, and ``config.SRATE``
+  otherwise, as before.
+* Every EEG sample is mirrored to the same ``Epoc X Packet Diagnostics`` stream
+  as the firmware-0x740 path, and packet-counter gaps are summarized on stderr.
+  The EEG and diagnostics samples share one timestamp.
 """
 
 import csv
@@ -16,9 +22,15 @@ import sys
 
 import hid
 from Crypto.Cipher import AES
-from pylsl import StreamInfo, StreamOutlet
+from pylsl import StreamInfo, StreamOutlet, local_clock
 
-from emotiv_lsl.emotiv_base import EmotivBase
+from emotiv_lsl.emotiv_base import (
+    EmotivBase,
+    PacketCounterTracker,
+    PacketDiagnostics,
+    PacketLossReporter,
+    make_packet_diagnostics_stream_info,
+)
 from config import SRATE
 
 
@@ -27,6 +39,13 @@ class EmotivEpocXLegacy(EmotivBase):
     LOG_FLUSH_INTERVAL = 256
     PROBE_READ_ATTEMPTS = 8
     PROBE_TIMEOUT_MS = 250
+    PACKET_DIAGNOSTICS_NAME = "Epoc X Packet Diagnostics"
+    # Byte 0 counts once per second of samples.  A 0x720 capture at 128 Hz
+    # (data/legacy_packets.csv, 10,032 reports) confirms that it counts 0..127,
+    # and that every report is EEG.  256 Hz is assumed to count 0..255, as on
+    # firmware 0x740, but has not been captured on this firmware.
+    COUNTER_MODULUS_128HZ = 128
+    COUNTER_MODULUS_256HZ = 256
 
     CH_NAMES = ['AF3', 'F7', 'F3', 'FC5', 'T7', 'P7',
                 'O1', 'O2', 'P8', 'T8', 'FC6', 'F4', 'F8', 'AF4']
@@ -41,6 +60,9 @@ class EmotivEpocXLegacy(EmotivBase):
         self.emit_debug = emit_debug
         self.packet_log_path = Path(packet_log_path) if packet_log_path else None
         self.sample_rate = float(sample_rate) if sample_rate else float(SRATE)
+        self.packet_tracker = PacketCounterTracker(
+            self.COUNTER_MODULUS_256HZ if self.sample_rate > 128 else self.COUNTER_MODULUS_128HZ
+        )
 
         self.cipher = AES.new(self.get_crypto_key(), AES.MODE_ECB)
 
@@ -216,8 +238,29 @@ class EmotivEpocXLegacy(EmotivBase):
     def log_decrypted_packet(self, writer: csv.writer, data: bytearray) -> None:
         writer.writerow(list(data))
 
+    def track_packet(self, counter: int) -> PacketDiagnostics:
+        """Update packet-loss accounting; never let it interrupt the EEG stream."""
+        if counter >= self.packet_tracker.modulus:
+            # A counter past 127 means the headset is at 256 Hz but the stream
+            # declares a lower rate, which rescales every frequency downstream.
+            print(
+                f"Epoc X: WARNING - packet counter reached {counter}, so the headset is "
+                f"streaming at 256 Hz but the LSL stream declares {self.sample_rate:g} Hz. "
+                "Restart with --sample-rate 256. Packet diagnostics now use a 0..255 counter.",
+                file=sys.stderr,
+                flush=True,
+            )
+            self.packet_tracker = PacketCounterTracker(self.COUNTER_MODULUS_256HZ)
+        return self.packet_tracker.update(counter)
+
     def main_loop(self):
         eeg_outlet = StreamOutlet(self.get_stream_info())
+        diagnostics_outlet = StreamOutlet(make_packet_diagnostics_stream_info(
+            self.PACKET_DIAGNOSTICS_NAME,
+            self.sample_rate,
+            self.packet_tracker.modulus,
+        ))
+        loss_reporter = PacketLossReporter('Epoc X')
         debug_outlet = StreamOutlet(self.get_debug_stream_info()) if self.emit_debug else None
 
         log_handle = None
@@ -254,7 +297,11 @@ class EmotivEpocXLegacy(EmotivBase):
                     continue
 
                 decrypted = self.decrypt_data(normalized)
-                eeg_outlet.push_sample(self.decode_eeg_sample(decrypted))
+                diagnostics = self.track_packet(decrypted[0])
+                timestamp = local_clock()
+                eeg_outlet.push_sample(self.decode_eeg_sample(decrypted), timestamp)
+                diagnostics_outlet.push_sample(diagnostics.as_lsl_sample(), timestamp)
+                loss_reporter.report(diagnostics)
 
                 if debug_outlet:
                     debug_outlet.push_sample(self.decode_debug_sample(decrypted))
