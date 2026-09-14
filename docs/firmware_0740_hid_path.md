@@ -82,9 +82,96 @@ plain = AES.new(aes_key, AES.MODE_ECB).decrypt(
 This path was validated against the supplied `data/capture.pcap` trace: the
 derived key produces correctly varying channel values and the decrypted packet
 counter advances through 5,188 captured EEG reports (including the initial
-baseline period). The implementation now
-selects this path automatically for feature-report firmware `>= 0x73f` and
-retains the serial-derived AES-128 path for older firmware.
+baseline period).
+
+## Supporting both firmware generations from one code path
+
+The feature report chooses the *preferred* key, not the only one. On each
+connection the reader builds every candidate it can - the serial-derived
+AES-128/`0x55` pair for pre-0x740 firmware and, when the feature report answers
+with the `06 ff` marker, the SHA-256/AES-256/`0x14` pair - and then confirms the
+choice against the packet stream: under the correct key byte 0 of the decrypted
+report advances by one per report, and under the wrong key it is effectively
+random. Up to twelve reports are buffered for that check and then published, so
+confirming the key costs no samples.
+
+This matters because the feature query is not a reliable firmware oracle. Older
+firmware may not answer it, may answer without the marker, or may answer with
+something that parses as a high firmware number. Any of those previously routed
+an older headset down the `0x740` path or aborted the run; the counter check now
+corrects the choice instead. `--firmware legacy` and `--firmware 0740` pin the
+path when the automatic choice has to be overridden, and
+`run_epochX_legacy.bat` applies the former on Windows.
+
+Interface discovery is firmware-independent for the same reason:
+
+* Emotiv interfaces are matched on a case-insensitive manufacturer string *or*
+  the receiver's vendor id `0x1234`, because Windows does not always report a
+  manufacturer string for these collections.
+* Candidates are probed in likelihood order (`EEG Signals` product string, then
+  `usage == 2`, then interface number) instead of enumeration order.
+* An interface that cannot be opened - Windows claims some HID collections, and
+  another application may hold one - is logged and skipped rather than raising.
+* If nothing streams during probing the best candidate is used anyway, because a
+  connected-but-idle headset is not a discovery failure.
+* The probed handle stays open into the streaming loop, so the collection is no
+  longer closed and reopened between probing and streaming.
+* `python main.py --list-hid` prints every HID interface the operating system
+  reports, which is the first thing to check when a headset is not recognized.
+
+## Sample rate
+
+EPOC X runs at either 128 Hz or 256 Hz depending on how the headset is
+configured, and nothing in the HID report distinguishes them: the packet
+counter increments once per report at either rate. The reader therefore times
+incoming reports for two seconds after the cipher is confirmed, snaps the
+result to the nearer supported rate, and declares that on every outlet. The
+reports consumed while measuring are published, not dropped, and the stream
+metadata records `sample_rate_source` as `measured` or `configured`.
+
+This matters because a wrong nominal rate is silent and doubles or halves every
+frequency downstream. The pilot recording `Pilot_EpochX_001.xdf` was captured
+with the rate hardcoded to 128 Hz while the headset streamed at 256 Hz
+(217,599 samples over 849.5 s = 256.1 Hz), so its alpha band sits at 4-6.5 Hz
+rather than 8-13 Hz and its apparent bandwidth ends at 24 Hz rather than 47 Hz.
+Nothing is wrong with the samples themselves - only the declared rate - so such
+a recording is corrected by relabelling it.
+
+`--sample-rate HZ` pins the rate when measuring is not wanted; an idle headset
+or an implausible measurement falls back to `config.SRATE` and says so.
+
+An LSL outlet's nominal rate is fixed when the outlet is created and cannot be
+changed afterwards, which is why the rate is settled before the outlets are
+built. Two consequences follow. First, the EEG outlet now appears a few seconds
+into startup rather than immediately, and only once the headset is actually
+streaming; a recorder that resolves streams once, at launch, should be started
+after the reader or told to refresh. Passing `--sample-rate` skips the
+measurement and removes that delay. Second, because a pinned rate cannot be
+checked in advance, `SampleRateMonitor` re-checks it against real arrivals over
+the first few seconds of streaming and warns loudly on a mismatch. That check
+runs whether the rate was measured or pinned, so a wrong rate is never silent.
+
+`config.SRATE` is no longer the source of truth for a live stream - it is only
+the fallback when the rate cannot be measured, and the default that
+`--sample-rate` overrides. Consumers should read `nominal_srate()` from the
+stream rather than importing the constant.
+
+## Packet diagnostics
+
+Each decoded report is also mirrored to an always-on `Epoc X Packet Diagnostics`
+LSL stream. Its 8-bit counter fields identify skipped or duplicated HID reports;
+the captured baseline packet used when a session restarts is reported with
+`RESET_FLAG` instead of being counted as packet loss. That baseline report is
+`00 10` followed by the byte pair `00 80` on every channel - the ADC midpoint,
+not a run of `0x80` bytes - and in `data/capture.pcap` it appears once, at the
+`185 -> 0` counter transition. Recognizing it keeps that restart from being
+reported as 70 missing reports; the capture otherwise contains no packet loss at
+all.
+
+Counter discontinuities are additionally summarized on stderr - the first one
+immediately, then at most once every ten seconds - so a run started from a
+launcher script shows packet loss in the console. The existing optional
+`Epoc X Debug` stream remains available via `--emit-debug`.
 
 ## Runtime relationship with Cortex quality streams
 

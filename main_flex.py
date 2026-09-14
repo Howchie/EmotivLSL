@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from emotiv_lsl.emotiv_flex import EmotivFlex
+from emotiv_lsl.emotiv_flex import DEFAULT_DC_RESTORE_HZ, EmotivFlex
 from emotiv_lsl.flex_montage import load_flex_montage
 
 
@@ -30,6 +30,25 @@ if __name__ == "__main__":
         "--serial",
         help="select a specific Flex dongle serial when multiple receivers are connected",
     )
+    parser.add_argument(
+        "--dc-restore-hz",
+        type=float,
+        default=DEFAULT_DC_RESTORE_HZ,
+        metavar="HZ",
+        help=(
+            "high-pass corner of the ADC accumulator's DC restore "
+            f"(default: {DEFAULT_DC_RESTORE_HZ}, the Flex passband corner; "
+            "0 disables it and restores the unbounded pure accumulator)"
+        ),
+    )
+    parser.add_argument(
+        "--reset-on-gap",
+        action="store_true",
+        help=(
+            "reset Flex ADC state to midpoint after a packet gap (legacy behavior; "
+            "normally leave disabled)"
+        ),
+    )
     args = parser.parse_args()
     montage = load_flex_montage(args.mapping)
     print(
@@ -42,4 +61,6 @@ if __name__ == "__main__":
         montage_name=montage.name,
         references=montage.references,
         serial_number=args.serial,
+        reset_on_gap=args.reset_on_gap,
+        dc_restore_hz=args.dc_restore_hz,
     ).main_loop()

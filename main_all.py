@@ -2,6 +2,7 @@ import argparse
 import threading
 
 from emotiv_lsl.cortex_bridge import BridgeConfig, run_bridge
+from emotiv_lsl.emotiv_base import print_all_hid_interfaces
 from emotiv_lsl.emotiv_epoc_x import EmotivEpocX
 from examples.view_contact_quality import DualQualityViewer
 
@@ -24,7 +25,34 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--print-samples", action="store_true")
     parser.add_argument("--emit-debug", action="store_true")
     parser.add_argument("--log-decrypted", metavar="PATH")
+    parser.add_argument(
+        "--sample-rate",
+        type=float,
+        default=None,
+        metavar="HZ",
+        help=(
+            "declare this EPOC X sample rate instead of measuring it at star"
+            "tup (the headset runs at 128 or 256 Hz and the HID report does not say which)"
+        ),
+    )
+    parser.add_argument(
+        "--firmware",
+        choices=EmotivEpocX.FIRMWARE_MODES,
+        default="auto",
+        help=(
+            "HID decryption path: auto detects and confirms it from the headset "
+            "(default), legacy forces the pre-0x740 serial-derived key, 0740 "
+            "forces the feature-report key"
+        ),
+    )
+    parser.add_argument(
+        "--list-hid",
+        action="store_true",
+        help="print every HID interface this machine reports, then exit",
+    )
     args = parser.parse_args()
+    if args.list_hid:
+        return args
     if not args.client_id or not args.client_secret:
         parser.error("client credentials are required via --client-id and --client-secret")
     return args
@@ -34,6 +62,8 @@ def start_eeg(args: argparse.Namespace) -> None:
     emotiv_epoc_x = EmotivEpocX(
         emit_debug=args.emit_debug,
         packet_log_path=args.log_decrypted,
+        firmware_mode=args.firmware,
+        sample_rate=args.sample_rate,
     )
     emotiv_epoc_x.main_loop()
 
@@ -55,6 +85,10 @@ def start_quality_bridge(args: argparse.Namespace) -> None:
 
 def main() -> None:
     args = parse_args()
+
+    if args.list_hid:
+        print_all_hid_interfaces()
+        return
 
     eeg_thread = threading.Thread(target=start_eeg, args=(args,), daemon=True, name="hid-eeg")
     eeg_thread.start()

@@ -9,18 +9,39 @@ it can therefore run beside the quality-only Cortex bridge.
 The packet order is always the wire labels (LA..LQ and RA..RQ). Flex 1.0
 allows the user to map those wires to arbitrary 10-20 positions, so callers
 can replace the LSL labels while retaining the wire name in channel metadata.
+Packet-counter discontinuities are reported on a companion LSL stream; the ADC
+accumulator is carried across a gap by default so loss does not create a
+midpoint step in every channel.  Because the protocol sends no absolute level,
+the accumulator is reconstructed with a leak rather than a pure integrator so
+that packet loss, electrode drift and floating wires all decay instead of
+accumulating without bound.
 """
 
 from __future__ import annotations
 
+import math
 import sys
 from collections.abc import Sequence
 
 import hid
 from Crypto.Cipher import AES
-from pylsl import StreamInfo, StreamOutlet
+from pylsl import StreamInfo, StreamOutlet, local_clock
 
-from emotiv_lsl.emotiv_base import EmotivBase
+from emotiv_lsl.emotiv_base import (
+    EmotivBase,
+    PacketCounterTracker,
+    PacketDiagnostics,
+    PacketLossReporter,
+    make_packet_diagnostics_stream_info,
+)
+
+
+# Flex 1.0 transmits deltas only: it never sends an absolute level, so the
+# accumulator has no anchor and any error - a lost report, electrode drift, a
+# floating wire - is permanent.  Reconstructing with a leak instead of a pure
+# integrator bounds all of them and reproduces the device's documented
+# 0.16-43 Hz passband (the 43 Hz roll-off is already in the analogue chain).
+DEFAULT_DC_RESTORE_HZ = 0.16
 
 
 class EmotivFlex(EmotivBase):
@@ -34,6 +55,8 @@ class EmotivFlex(EmotivBase):
     ADC_MIDPOINT = 1 << (ADC_BITS - 1)
     EEG_USAGE = 2
     EEG_PRODUCT_MARKER = "eeg signals"
+    PACKET_COUNTER_MODULUS = 1 << 7
+    PACKET_DIAGNOSTICS_NAME = "Epoc Flex 1.0 Packet Diagnostics"
 
     # The controller uses A-H and J-Q on each side (I is the reference slot).
     CH_NAMES = (
@@ -50,9 +73,21 @@ class EmotivFlex(EmotivBase):
         montage_name: str | None = None,
         references: dict[str, str] | None = None,
         serial_number: str | None = None,
+        reset_on_gap: bool = False,
+        dc_restore_hz: float = DEFAULT_DC_RESTORE_HZ,
     ) -> None:
         self.cipher: AES | None = None
         self.remove_dc = remove_dc
+        self.reset_on_gap = bool(reset_on_gap)
+        self.dc_restore_hz = float(dc_restore_hz)
+        if self.dc_restore_hz < 0:
+            raise ValueError("dc_restore_hz must not be negative")
+        # One-pole leak toward the midpoint.  1.0 is a pure accumulator.
+        self._leak = (
+            1.0
+            if self.dc_restore_hz == 0
+            else math.exp(-2 * math.pi * self.dc_restore_hz / self.SAMPLE_RATE)
+        )
         if channel_labels is None:
             channel_labels = self.CH_NAMES
         if len(channel_labels) != len(self.CH_NAMES):
@@ -71,9 +106,13 @@ class EmotivFlex(EmotivBase):
             if str(value).strip()
         }
         self.serial_number = serial_number.strip() if serial_number else None
-        self._adc = [self.ADC_MIDPOINT] * len(self.CH_NAMES)
+        self._adc = [float(self.ADC_MIDPOINT)] * len(self.CH_NAMES)
         self._last_counter: int | None = None
         self.packet_gaps = 0
+        self.missing_reports = 0
+        self.packet_resets = 0
+        self._packet_tracker = PacketCounterTracker(self.PACKET_COUNTER_MODULUS)
+        self._last_packet_diagnostics: PacketDiagnostics | None = None
 
     @staticmethod
     def _is_eeg_device(device: dict) -> bool:
@@ -166,8 +205,14 @@ class EmotivFlex(EmotivBase):
         """Extract Cortex's 32 signed seven-bit values from one plaintext.
 
         Bytes 0 and 1 are packet metadata.  Bytes 2..29 contain 224 bits,
-        exactly 32 values of seven bits each, in MSB-first order.  The wire
-        values are unsigned; two's-complement conversion gives -64..63.
+        exactly 32 values of seven bits each, in MSB-first order.
+
+        The wire values are *offset binary*: 64 encodes a zero delta, so the
+        signed value is ``raw - 64`` and the range is -64..63.  This is not
+        two's complement.  Reading them as two's complement maps the most
+        common values (a small delta, i.e. raw near 64) onto the extremes
+        +-64, which injects a large artificial slew on every sample and makes
+        the accumulator run away; see docs/flex_1_hid_path.md.
         """
 
         if len(packet) != EmotivFlex.READ_SIZE:
@@ -181,7 +226,7 @@ class EmotivFlex(EmotivBase):
                 value = (value << 1) | (
                     (payload[bit_position // 8] >> (7 - bit_position % 8)) & 1
                 )
-            values.append(value if value < 64 else value - 128)
+            values.append(value - 64)
         return values
 
     def configure_cipher(self, device: dict) -> None:
@@ -198,16 +243,25 @@ class EmotivFlex(EmotivBase):
     def decode_data(self, data: bytes | bytearray | list[int]) -> list[float]:
         plaintext = self.decrypt_data(data)
         counter = plaintext[0] & 0x7F
-        if self._last_counter is not None and counter != ((self._last_counter + 1) & 0x7F):
-            self.packet_gaps += 1
-            # Missing deltas cannot be reconstructed.  Start the next run at
-            # the ADC midpoint rather than allowing the missing samples to
-            # create an unbounded offset.
-            self._adc = [self.ADC_MIDPOINT] * len(self.CH_NAMES)
+        diagnostics = self._packet_tracker.update(counter)
+        self._last_packet_diagnostics = diagnostics
+        self.packet_gaps = diagnostics.cumulative_gaps
+        self.missing_reports = diagnostics.cumulative_missing
+        self.packet_resets = diagnostics.cumulative_resets
         self._last_counter = counter
 
+        if diagnostics.gap and self.reset_on_gap:
+            # Retained as an explicit compatibility option.  The default is
+            # to carry the ADC state across a gap: a single omitted 7-bit
+            # delta is bounded, while a midpoint reset creates a large
+            # artificial step in every channel.
+            self._adc = [float(self.ADC_MIDPOINT)] * len(self.CH_NAMES)
+
         for index, delta in enumerate(self.unpack_signed_deltas(plaintext)):
-            self._adc[index] = max(0, min(self.ADC_MAX, self._adc[index] + delta))
+            centered = (self._adc[index] - self.ADC_MIDPOINT) * self._leak + delta
+            self._adc[index] = max(
+                0.0, min(float(self.ADC_MAX), self.ADC_MIDPOINT + centered)
+            )
 
         if self.remove_dc:
             return [
@@ -241,12 +295,27 @@ class EmotivFlex(EmotivBase):
         cap.append_child_value("name", "EPOC Flex 1.0")
         cap.append_child_value("labelscheme", "user-configurable 10-20")
         cap.append_child_value("montage", self.montage_name)
+        cap.append_child_value("dc_restore_hz", str(self.dc_restore_hz))
         for reference, location in sorted(self.references.items()):
             cap.append_child_value(reference.lower(), location)
         return info
 
+    def get_packet_diagnostics_stream_info(self) -> StreamInfo:
+        return make_packet_diagnostics_stream_info(
+            self.PACKET_DIAGNOSTICS_NAME,
+            self.SAMPLE_RATE,
+            self.PACKET_COUNTER_MODULUS,
+        )
+
+    def get_packet_diagnostics_sample(self) -> list[float]:
+        if self._last_packet_diagnostics is None:
+            raise RuntimeError("packet diagnostics are unavailable before the first EEG packet")
+        return self._last_packet_diagnostics.as_lsl_sample()
+
     def main_loop(self) -> None:
         outlet = StreamOutlet(self.get_stream_info())
+        diagnostics_outlet = StreamOutlet(self.get_packet_diagnostics_stream_info())
+        loss_reporter = PacketLossReporter('Epoc Flex 1.0')
         device = self.get_hid_device()
         hid_device = hid.device()
         hid_device.open_path(device["path"])
@@ -262,6 +331,13 @@ class EmotivFlex(EmotivBase):
                 packet = hid_device.read(self.READ_SIZE, timeout_ms=1000)
                 if not self.validate_data(packet):
                     continue
-                outlet.push_sample(self.decode_data(packet))
+                decoded = self.decode_data(packet)
+                loss_reporter.report(self._last_packet_diagnostics)
+                timestamp = local_clock()
+                outlet.push_sample(decoded, timestamp=timestamp)
+                diagnostics_outlet.push_sample(
+                    self.get_packet_diagnostics_sample(),
+                    timestamp=timestamp,
+                )
         finally:
             hid_device.close()

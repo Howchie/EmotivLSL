@@ -1,6 +1,6 @@
 import pyshark
 from Crypto.Cipher import AES
-from pylsl import StreamOutlet
+from pylsl import StreamOutlet, local_clock
 
 from emotiv_lsl.emotiv_epoc_x import EmotivEpocX
 
@@ -8,6 +8,7 @@ from emotiv_lsl.emotiv_epoc_x import EmotivEpocX
 class EmotivEpocXPyShark(EmotivEpocX):
 
     def __init__(self) -> None:
+        super().__init__()
         self.delimiter = ','
 
         self.cipher = AES.new(self.get_crypto_key(), AES.MODE_ECB)
@@ -20,6 +21,7 @@ class EmotivEpocXPyShark(EmotivEpocX):
 
     def main_loop(self):
         outlet = StreamOutlet(self.get_stream_info())
+        diagnostics_outlet = StreamOutlet(self.get_packet_diagnostics_stream_info())
         for packet in self.capture.sniff_continuously():
             if packet.usb.dst != 'host':
                 continue
@@ -30,4 +32,9 @@ class EmotivEpocXPyShark(EmotivEpocX):
             if self.validate_data(data):
                 data = bytearray.fromhex(data)
                 decoded = self.decode_data(data)
-                outlet.push_sample(decoded)
+                timestamp = local_clock()
+                outlet.push_sample(decoded, timestamp=timestamp)
+                diagnostics_outlet.push_sample(
+                    self.get_packet_diagnostics_sample(),
+                    timestamp=timestamp,
+                )

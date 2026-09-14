@@ -24,6 +24,9 @@ Connect dongle, turn on the headset, wait for the light from two indicators
 On Windows, `run.bat` (or the explicit `run_epochX.bat`) launches the EPOC X
 EEG and Cortex LSL streams with the repository's configured developer
 credentials.  `run_flex.bat` launches the original EPOC Flex 1.0 path.
+`run_epochX_legacy.bat` is the same EPOC X launcher pinned to the pre-0x740
+decryption path; it is only needed if automatic firmware detection picks
+wrong.
 
 ```
 # frist terminal
@@ -118,6 +121,36 @@ activated session. The existing default `dev eq` bridge remains unactivated and
 continues to work for quality-only access. EmotivPRO's integrated LSL EEG outlet
 is another supported fallback when EmotivPRO is licensed.
 
+#### Both EPOC X firmware generations from one launcher
+
+No firmware-specific launcher or headset update is needed. On every connection
+the reader builds both keys it can - the pre-0x740 serial-derived AES-128 key
+and, when the feature report answers, the 0x740 AES-256 key - and confirms the
+choice against the decrypted packet counter, which only advances by one per
+report under the correct key. A headset whose feature report is missing,
+silent, or misreported therefore still streams.
+
+Interface discovery is also firmware-independent: Emotiv interfaces are matched
+on the manufacturer string *or* the receiver's vendor id (Windows does not
+always report the former), the most likely EEG collection is probed first, and
+an interface that cannot be opened or stays silent no longer aborts the run.
+
+Override the automatic choice only if it picks wrong:
+
+```bash
+python -m pipenv run python main.py --firmware legacy   # force the pre-0x740 key
+python -m pipenv run python main.py --firmware 0740     # force the feature-report key
+```
+
+On Windows, `run_epochX_legacy.bat` is the same launcher as `run_epochX.bat`
+with `--firmware legacy` applied. If a headset is not recognized at all, print
+what the operating system actually enumerates:
+
+```bash
+python -m pipenv run python main.py --list-hid
+```
+
+
 ### Inspect a firmware-740 HID feature report
 
 The direct HID decoder can query the feature report after opening the EEG
@@ -201,6 +234,12 @@ supplied with `--mapping PATH`. The full reverse-engineered path and current
 caveats are in
 [`docs/flex_1_hid_path.md`](docs/flex_1_hid_path.md).
 
+The direct reader also publishes an always-on `Epoc Flex 1.0 Packet Diagnostics`
+LSL stream beside the EEG outlet. It contains the 7-bit packet counter,
+expected counter, per-sample gap/reset flags, and cumulative missing-report
+counts. The Flex ADC accumulator is carried across gaps by default; use
+`--reset-on-gap` only to reproduce the legacy midpoint-reset behavior.
+
 To launch Flex EEG and the unlicensed Cortex quality streams together:
 
 ```bash
@@ -283,6 +322,7 @@ python -m pipenv run python main_all.py --client-id YOUR_ID --client-secret YOUR
 This starts:
 
 * `Epoc X` EEG over the raw HID path
+* `Epoc X Packet Diagnostics` (counter/gap metadata, timestamped with EEG)
 * `Epoc X Contact Quality` from Cortex `dev`
 * `Epoc X EEG Quality` from Cortex `eq`
 * the live dual-panel viewer
@@ -293,9 +333,19 @@ Change device sampling rate in config.py and emotiv app
 
 ### Probe hidden quality fields
 
-This repo currently publishes only the 14 EEG channels. The decrypted packet also
-contains four non-EEG bytes that are not exposed by default. To inspect whether
-they carry useful quality information without breaking existing EEG consumers:
+This repo publishes the 14 EEG channels and an always-on `Epoc X Packet
+Diagnostics` stream. Counter discontinuities are also summarized on the console
+(the first one immediately, then at most once every ten seconds) so packet loss
+is visible without an LSL consumer attached. The diagnostics stream is timestamped alongside the EEG
+samples and includes the decrypted 8-bit packet counter, expected counter,
+per-sample gap/reset flags, and cumulative loss/reset counts. A gap flag marks
+the first received sample after a counter discontinuity; it does not alter the
+EEG values. Use those fields to mark or reject short acquisition windows in
+analysis.
+
+The decrypted packet also contains four non-EEG bytes that are not exposed by
+default. To inspect whether they carry useful quality information without
+breaking existing EEG consumers:
 
 ```bash
 python -m pipenv run python main.py --emit-debug --log-decrypted data/decrypted_packets.csv
@@ -321,6 +371,12 @@ Suggested test protocol:
 If these bytes do not track contact quality, the next step is to treat true contact
 quality as unavailable on the HID path and implement a separate signal-quality proxy
 instead of calling it contact quality.
+
+The Flex launcher similarly publishes `Epoc Flex 1.0 Packet Diagnostics` beside
+the 32-channel EEG stream. Flex uses a 7-bit wrapping counter and the same
+diagnostic channel names. Its ADC accumulator is carried across packet gaps by
+default; pass `--reset-on-gap` only when reproducing the legacy midpoint-reset
+behavior.
 
 ### Examples
 
