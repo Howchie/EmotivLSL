@@ -195,7 +195,18 @@ and sets `RESET_FLAG` to mark `MISSING_REPORTS` as an estimate. The last column,
 `FILLED`, is shared with the Flex stream, which publishes stand-ins for lost
 samples. EPOC X does not fill, so it is always 0 here. EPOC X timestamps
 remain arrival times. Its repeats arrive as extras rather than taking a slot,
-and no arrival delay building up in whole periods has been seen on EPOC X.
+and no arrival delay building up in whole periods has been seen on EPOC X: in
+a 30 s 128 Hz recording on 0x740, arrivals sat a median 0.7 ms (99th
+percentile 4.3 ms) above a straight line through the counter.
+
+Because lost samples are not filled, the EEG, diagnostics and debug streams
+from both EPOC X readers declare
+`<synchronization><can_drop_samples>true</can_drop_samples></synchronization>`.
+pyxdf (1.17+) then keeps the arrival timestamps. Without it, pyxdf refits
+timestamps against sample number and only breaks the fit at gaps over
+3.9 s at 128 Hz. In a simulated 10-minute recording, one 16-sample dropout
+at 3 minutes shifted the fitted timestamps by +56 ms before it and −68 ms
+after it. Turn off jitter removal in loaders that ignore the flag.
 
 On firmware 0x720, a 128 Hz capture (`data/legacy_packets.csv`) confirms the
 counter format. It holds 10,032 reports, all EEG (byte 1 is always `0x10`).

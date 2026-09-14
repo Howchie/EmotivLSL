@@ -263,7 +263,8 @@ with a different delay. Reject a window around every `RESET_FLAG` in analysis.
 `<synchronization><can_drop_samples>true</can_drop_samples></synchronization>`.
 pyxdf (1.17+) then keeps their timestamps rather than refitting them over sample
 number. Other loaders that do not honour the flag still see evenly
-spaced, gap-free samples, because lost samples are filled.
+spaced, gap-free samples, because lost samples are filled. The EPOC X streams
+declare the same flag.
 
 ### Replay check
 

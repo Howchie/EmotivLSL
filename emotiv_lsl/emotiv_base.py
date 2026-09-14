@@ -342,10 +342,12 @@ class CounterClock:
 
 
 def declare_can_drop_samples(info: StreamInfo) -> None:
-    """Tell XDF readers the timestamps already account for lost samples.
+    """Tell XDF readers each timestamp is already right, even after lost samples.
 
     pyxdf otherwise replaces a stream's timestamps with a straight-line fit
-    over sample number, which would undo the reader's own timestamps.
+    over sample number. That undoes the Flex counter timestamps, and on EPOC X,
+    which does not fill lost samples, one 16-sample dropout in a 10-minute
+    recording shifts the fitted timestamps by up to 68 ms.
     """
 
     info.desc().append_child("synchronization").append_child_value("can_drop_samples", "true")

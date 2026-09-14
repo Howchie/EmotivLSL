@@ -363,7 +363,11 @@ marks the first received sample after a counter discontinuity; it does not alter
 the EEG values. After a dropout longer than half a second, the missing count
 includes whole counter cycles estimated from arrival time, and `RESET_FLAG`
 marks it as an estimate. Use those fields to mark or reject short acquisition
-windows in analysis.
+windows in analysis. EPOC X timestamps are arrival times and lost samples are
+not filled, so the EPOC X streams tell XDF loaders not to refit timestamps
+over sample number; pyxdf honours this automatically. With any other loader,
+turn jitter removal off, or a single short dropout can shift timestamps by
+tens of milliseconds.
 
 The decrypted packet also contains four non-EEG bytes that are not exposed by
 default. To inspect whether they carry useful quality information without

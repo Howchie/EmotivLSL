@@ -33,6 +33,7 @@ from emotiv_lsl.emotiv_base import (
     PacketDiagnostics,
     PacketLossReporter,
     RepeatedReportFilter,
+    declare_can_drop_samples,
     make_packet_diagnostics_stream_info,
 )
 from config import SRATE
@@ -130,6 +131,7 @@ class EmotivEpocXLegacy(EmotivBase):
         cap = info.desc().append_child("cap")
         cap.append_child_value("name", "easycap-M1")
         cap.append_child_value("labelscheme", "10-20")
+        declare_can_drop_samples(info)
 
         return info
 
@@ -141,6 +143,7 @@ class EmotivEpocXLegacy(EmotivBase):
             ch.append_child_value("label", label)
             ch.append_child_value("unit", "unknown")
             ch.append_child_value("type", "Debug")
+        declare_can_drop_samples(info)
         return info
 
     def decrypt_data(self, data) -> bytearray:
@@ -270,6 +273,7 @@ class EmotivEpocXLegacy(EmotivBase):
             self.PACKET_DIAGNOSTICS_NAME,
             self.sample_rate,
             self.packet_tracker.modulus,
+            can_drop_samples=True,
         ))
         loss_reporter = PacketLossReporter('Epoc X')
         debug_outlet = StreamOutlet(self.get_debug_stream_info()) if self.emit_debug else None

@@ -15,6 +15,7 @@ from emotiv_lsl.emotiv_base import (
     PacketLossReporter,
     RepeatedReportFilter,
     SampleRateMonitor,
+    declare_can_drop_samples,
     make_packet_diagnostics_stream_info,
 )
 from emotiv_lsl.emotiv_epoc_x_legacy import EmotivEpocXLegacy
@@ -565,6 +566,7 @@ class EmotivEpocX(EmotivBase):
         cap.append_child_value("labelscheme", "10-20")
         info.desc().append_child_value("sample_rate_source",
                                        "configured" if self.requested_sample_rate else "measured")
+        declare_can_drop_samples(info)
 
         return info
 
@@ -573,6 +575,7 @@ class EmotivEpocX(EmotivBase):
             self.PACKET_DIAGNOSTICS_NAME,
             self.sample_rate,
             self.PACKET_COUNTER_MODULUS,
+            can_drop_samples=True,
         )
 
     def get_packet_diagnostics_sample(self) -> list[float]:
@@ -588,6 +591,7 @@ class EmotivEpocX(EmotivBase):
             ch.append_child_value("label", label)
             ch.append_child_value("unit", "unknown")
             ch.append_child_value("type", "Debug")
+        declare_can_drop_samples(info)
         return info
 
     def decrypt_data(self, data) -> bytearray:
