@@ -169,6 +169,42 @@ corresponding EEG sample. The same events are summarized on stderr - the first
 one immediately, then at most once every ten seconds - so packet loss is visible
 in the console without an LSL consumer attached.
 
+### Repeated reports
+
+The Flex dongle sometimes delivers the previous report a second time. There
+are two such copies in `data/flex2.pcap`, and both are identical in all 32
+bytes: counter, metadata bytes 1 and 30–31, and payload. A 60 s bench
+recording through the Flex's own dongle had 8. In every case the counter and
+all 32 channel deltas matched the report before it.
+
+The reader drops a report that is byte-identical to the previous one. Publishing
+it would add a fake sample and, because the payload is deltas, apply the same
+delta to every channel a second time. The next sample would be offset by up to
+one full slew step (32.64 µV), fading over about a second. In the `flex2.pcap`
+replay, dropping the two repeats changes the next sample by up to 33 µV. A dropped
+repeat counts as one discontinuity with nothing missing. Its `GAP_FLAG` is set
+on the next published sample, and `--reset-on-gap` ignores it.
+
+Repeats must be matched on the whole report, not the payload alone. Real
+consecutive reports can have identical payloads. In `flex2.pcap`, reports with
+counters 17 and 18 both have every channel at the maximum slew (+63 or −64), as
+floating or saturated wires produce. Their counters and metadata bytes differ,
+so the whole-report comparison keeps both.
+
+Flex timing differs from the EPOC X. There, a repeat is squeezed in as an
+extra report. On Flex, the dongle's reports stay evenly spaced when counted by
+report, and the counter is what jumps. In the 60 s recording, each repeat took
+a normal slot, so the headset's samples ran one period late after it. The
+counter also jumped 121 → 1 (7 reports) with no gap in arrival time. Counted
+per report and per counter, the rates agree over the recording (127.985 vs
+127.984 Hz): the 8 inserted copies were roughly offset by 7 dropped samples.
+That suggests the dongle keeps a fixed output clock, pads with a copy when a
+radio packet is late, and later discards the backlog. It is an inference from
+timing, not a confirmed mechanism. Either way, such a loss leaves no gap in the
+LSL timestamps. Only `MISSING_REPORTS` and `CUMULATIVE_MISSING` show it.
+
+### Replay check
+
 Replaying `data/flex2.pcap` (1,681 reports, 8 counter discontinuities) through
 the reader shows the effect directly: carrying the accumulator keeps the largest
 step between consecutive samples at 32.64 uV, which is the protocol's maximum

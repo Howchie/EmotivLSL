@@ -32,6 +32,7 @@ from emotiv_lsl.emotiv_base import (
     PacketCounterTracker,
     PacketDiagnostics,
     PacketLossReporter,
+    RepeatedReportFilter,
     make_packet_diagnostics_stream_info,
 )
 
@@ -112,6 +113,7 @@ class EmotivFlex(EmotivBase):
         self.missing_reports = 0
         self.packet_resets = 0
         self._packet_tracker = PacketCounterTracker(self.PACKET_COUNTER_MODULUS)
+        self._repeats = RepeatedReportFilter()
         self._last_packet_diagnostics: PacketDiagnostics | None = None
 
     @staticmethod
@@ -241,7 +243,18 @@ class EmotivFlex(EmotivBase):
         return self.cipher.decrypt(packet)
 
     def decode_data(self, data: bytes | bytearray | list[int]) -> list[float]:
-        plaintext = self.decrypt_data(data)
+        return self.decode_plaintext(self.decrypt_data(data))
+
+    def skip_repeated_report(self, plaintext: bytes) -> PacketDiagnostics:
+        """Count a dropped repeat without applying its deltas a second time."""
+
+        diagnostics = self._packet_tracker.skip_repeat(plaintext[0] & 0x7F)
+        self.packet_gaps = diagnostics.cumulative_gaps
+        self.missing_reports = diagnostics.cumulative_missing
+        self.packet_resets = diagnostics.cumulative_resets
+        return diagnostics
+
+    def decode_plaintext(self, plaintext: bytes) -> list[float]:
         counter = plaintext[0] & 0x7F
         diagnostics = self._packet_tracker.update(counter)
         self._last_packet_diagnostics = diagnostics
@@ -250,11 +263,12 @@ class EmotivFlex(EmotivBase):
         self.packet_resets = diagnostics.cumulative_resets
         self._last_counter = counter
 
-        if diagnostics.gap and self.reset_on_gap:
+        if diagnostics.gap and self.reset_on_gap and not diagnostics.flag_from_dropped_repeat:
             # Retained as an explicit compatibility option.  The default is
             # to carry the ADC state across a gap: a single omitted 7-bit
             # delta is bounded, while a midpoint reset creates a large
-            # artificial step in every channel.
+            # artificial step in every channel.  A dropped repeat loses
+            # nothing, so it never resets.
             self._adc = [float(self.ADC_MIDPOINT)] * len(self.CH_NAMES)
 
         for index, delta in enumerate(self.unpack_signed_deltas(plaintext)):
@@ -331,7 +345,14 @@ class EmotivFlex(EmotivBase):
                 packet = hid_device.read(self.READ_SIZE, timeout_ms=1000)
                 if not self.validate_data(packet):
                     continue
-                decoded = self.decode_data(packet)
+                plaintext = self.decrypt_data(packet)
+                # A byte-identical copy of the previous report must not be
+                # published: it would add a fake sample and apply the same
+                # deltas twice.
+                if self._repeats.is_repeat(plaintext):
+                    loss_reporter.report(self.skip_repeated_report(plaintext))
+                    continue
+                decoded = self.decode_plaintext(plaintext)
                 loss_reporter.report(self._last_packet_diagnostics)
                 timestamp = local_clock()
                 outlet.push_sample(decoded, timestamp=timestamp)

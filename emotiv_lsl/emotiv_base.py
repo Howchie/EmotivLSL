@@ -35,6 +35,19 @@ class PacketDiagnostics:
     # Console-only: this report was a dropped repeat, not a published sample.
     repeat: bool = False
 
+    @property
+    def flag_from_dropped_repeat(self) -> bool:
+        """GAP_FLAG is set only because the previous report was a dropped repeat.
+
+        A normal +1 step never sets GAP_FLAG on its own, so this case is exact.
+        """
+        return (
+            self.gap
+            and not self.repeat
+            and not self.missing_reports
+            and self.counter == self.expected_counter
+        )
+
     def as_lsl_sample(self) -> list[float]:
         return [
             float(self.counter),
@@ -127,13 +140,15 @@ class PacketCounterTracker:
 class RepeatedReportFilter:
     """Recognize a report delivered twice in a row, byte for byte.
 
-    EPOC X headsets on firmware 0x720 and 0x740 occasionally hand the host the
-    previous report again before the next one arrives.  In recordings with
-    diagnostics, the counter never skips around a repeat.  The rate is also
-    identical across recordings (128.066 Hz) once repeats are removed, so the
-    copy is an extra, not a stand-in for a lost sample.  Publishing it inserts
-    a fake sample.  Consecutive real samples always differ, because the
-    counter advances.
+    EPOC X (firmware 0x720 and 0x740) and Flex 1.0 dongles occasionally hand
+    the host the previous report again.  Every repeat captured so far is
+    identical in all 32 bytes, counter included.  Publishing it inserts a fake
+    sample, and on Flex it applies the same channel deltas twice.
+
+    The whole report must match, not just its EEG payload.  Consecutive real
+    reports always differ because the counter advances.  Payloads alone can
+    match: ``data/flex2.pcap`` has two real consecutive Flex reports (counters
+    17 and 18) whose channels all sit at the maximum slew.
     """
 
     def __init__(self) -> None:
@@ -171,15 +186,8 @@ class PacketLossReporter:
                 f"{diagnostics.cumulative_resets} restart(s) so far"
             )
             return
-        if not diagnostics.gap:
-            return
-        if (
-            not diagnostics.repeat
-            and not diagnostics.missing_reports
-            and diagnostics.counter == diagnostics.expected_counter
-        ):
-            # A GAP_FLAG carried over from a dropped repeat, which was already
-            # reported when it was dropped.
+        if not diagnostics.gap or diagnostics.flag_from_dropped_repeat:
+            # A carried flag was already reported when the repeat was dropped.
             return
 
         # Always announce the first gap, then summarize periodically so a bad
