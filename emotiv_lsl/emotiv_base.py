@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import sys
 import time
 
@@ -32,6 +32,8 @@ class PacketDiagnostics:
     reset: bool
     cumulative_gaps: int
     cumulative_resets: int
+    # Console-only: this report was a dropped repeat, not a published sample.
+    repeat: bool = False
 
     def as_lsl_sample(self) -> list[float]:
         return [
@@ -62,6 +64,19 @@ class PacketCounterTracker:
         self.cumulative_gaps = 0
         self.cumulative_missing = 0
         self.cumulative_resets = 0
+        self.cumulative_repeats = 0
+        self._flag_next_sample = False
+
+    def skip_repeat(self, counter: int) -> PacketDiagnostics:
+        """Account for a dropped byte-identical repeat of the previous report.
+
+        The repeat counts as one discontinuity with nothing missing.  It is not
+        published, so its GAP_FLAG is carried to the next published sample.
+        """
+        diagnostics = replace(self.update(counter), repeat=True)
+        self.cumulative_repeats += 1
+        self._flag_next_sample = True
+        return diagnostics
 
     def update(self, counter: int, *, reset_hint: bool = False) -> PacketDiagnostics:
         counter = int(counter)
@@ -92,6 +107,10 @@ class PacketCounterTracker:
                     self.cumulative_gaps += 1
                     self.cumulative_missing += missing
 
+        if self._flag_next_sample:
+            # The previous report was a dropped repeat; flag this sample instead.
+            gap = True
+            self._flag_next_sample = False
         self.last_counter = counter
         return PacketDiagnostics(
             counter=counter,
@@ -103,6 +122,28 @@ class PacketCounterTracker:
             cumulative_gaps=self.cumulative_gaps,
             cumulative_resets=self.cumulative_resets,
         )
+
+
+class RepeatedReportFilter:
+    """Recognize a report delivered twice in a row, byte for byte.
+
+    EPOC X headsets on firmware 0x720 and 0x740 occasionally hand the host the
+    previous report again before the next one arrives.  In recordings with
+    diagnostics, the counter never skips around a repeat.  The rate is also
+    identical across recordings (128.066 Hz) once repeats are removed, so the
+    copy is an extra, not a stand-in for a lost sample.  Publishing it inserts
+    a fake sample.  Consecutive real samples always differ, because the
+    counter advances.
+    """
+
+    def __init__(self) -> None:
+        self._previous: bytes | None = None
+
+    def is_repeat(self, report) -> bool:
+        report = bytes(report)
+        repeat = report == self._previous
+        self._previous = report
+        return repeat
 
 
 class PacketLossReporter:
@@ -132,6 +173,14 @@ class PacketLossReporter:
             return
         if not diagnostics.gap:
             return
+        if (
+            not diagnostics.repeat
+            and not diagnostics.missing_reports
+            and diagnostics.counter == diagnostics.expected_counter
+        ):
+            # A GAP_FLAG carried over from a dropped repeat, which was already
+            # reported when it was dropped.
+            return
 
         # Always announce the first gap, then summarize periodically so a bad
         # radio link cannot flood the console at the sample rate.
@@ -140,7 +189,12 @@ class PacketLossReporter:
             return
         self._reported_a_gap = True
         self._next_gap_report = now + self.interval_seconds
-        if diagnostics.missing_reports:
+        if diagnostics.repeat:
+            message = (
+                f"dropped a repeated report: counter {diagnostics.counter} arrived twice "
+                "with identical bytes (an extra copy; no reports missing)"
+            )
+        elif diagnostics.missing_reports:
             message = (
                 f"dropped packets: counter {diagnostics.counter} arrived where "
                 f"{diagnostics.expected_counter} was expected "

@@ -14,6 +14,9 @@ additions only work on packets after they are decrypted:
 * Every EEG sample is mirrored to the same ``Epoc X Packet Diagnostics`` stream
   as the firmware-0x740 path, and packet-counter gaps are summarized on stderr.
   The EEG and diagnostics samples share one timestamp.
+* A report that repeats the previous one byte for byte is not published.  It
+  is an extra copy, not a new sample.  It is still counted in the diagnostics,
+  and it is kept in the ``--log-decrypted`` CSV.
 """
 
 import csv
@@ -29,6 +32,7 @@ from emotiv_lsl.emotiv_base import (
     PacketCounterTracker,
     PacketDiagnostics,
     PacketLossReporter,
+    RepeatedReportFilter,
     make_packet_diagnostics_stream_info,
 )
 from config import SRATE
@@ -63,6 +67,7 @@ class EmotivEpocXLegacy(EmotivBase):
         self.packet_tracker = PacketCounterTracker(
             self.COUNTER_MODULUS_256HZ if self.sample_rate > 128 else self.COUNTER_MODULUS_128HZ
         )
+        self.repeats = RepeatedReportFilter()
 
         self.cipher = AES.new(self.get_crypto_key(), AES.MODE_ECB)
 
@@ -297,14 +302,8 @@ class EmotivEpocXLegacy(EmotivBase):
                     continue
 
                 decrypted = self.decrypt_data(normalized)
-                diagnostics = self.track_packet(decrypted[0])
-                timestamp = local_clock()
-                eeg_outlet.push_sample(self.decode_eeg_sample(decrypted), timestamp)
-                diagnostics_outlet.push_sample(diagnostics.as_lsl_sample(), timestamp)
-                loss_reporter.report(diagnostics)
-
-                if debug_outlet:
-                    debug_outlet.push_sample(self.decode_debug_sample(decrypted))
+                # The packet log keeps every report, repeats included, as the
+                # raw record of what the headset sent.
                 if log_writer:
                     self.log_decrypted_packet(log_writer, decrypted)
                     logged_packets += 1
@@ -312,6 +311,19 @@ class EmotivEpocXLegacy(EmotivBase):
                         print("Received first valid decrypted packet.", file=sys.stderr, flush=True)
                     if logged_packets % self.LOG_FLUSH_INTERVAL == 0:
                         log_handle.flush()
+
+                if self.repeats.is_repeat(decrypted):
+                    loss_reporter.report(self.packet_tracker.skip_repeat(decrypted[0]))
+                    continue
+
+                diagnostics = self.track_packet(decrypted[0])
+                timestamp = local_clock()
+                eeg_outlet.push_sample(self.decode_eeg_sample(decrypted), timestamp)
+                diagnostics_outlet.push_sample(diagnostics.as_lsl_sample(), timestamp)
+                loss_reporter.report(diagnostics)
+
+                if debug_outlet:
+                    debug_outlet.push_sample(self.decode_debug_sample(decrypted), timestamp)
         finally:
             hid_device.close()
             if log_handle:

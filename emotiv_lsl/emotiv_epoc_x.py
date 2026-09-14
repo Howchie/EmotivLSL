@@ -13,6 +13,7 @@ from emotiv_lsl.emotiv_base import (
     PacketCounterTracker,
     PacketDiagnostics,
     PacketLossReporter,
+    RepeatedReportFilter,
     SampleRateMonitor,
     make_packet_diagnostics_stream_info,
 )
@@ -103,6 +104,7 @@ class EmotivEpocX(EmotivBase):
         self.decryption_path = None
         self.PACKET_COUNTER_MODULUS = self.counter_modulus_for_rate(self.sample_rate)
         self._packet_tracker = PacketCounterTracker(self.PACKET_COUNTER_MODULUS)
+        self._repeats = RepeatedReportFilter()
         self._last_packet_diagnostics: PacketDiagnostics | None = None
         self.packet_gaps = 0
         self.missing_reports = 0
@@ -751,6 +753,15 @@ class EmotivEpocX(EmotivBase):
                     return False
         return True
 
+    def _skip_repeated_packet(self, data: bytearray) -> PacketDiagnostics:
+        """Count a dropped repeat; the next published sample carries its flag."""
+
+        diagnostics = self._packet_tracker.skip_repeat(int(data[0]))
+        self.packet_gaps = diagnostics.cumulative_gaps
+        self.missing_reports = diagnostics.cumulative_missing
+        self.packet_resets = diagnostics.cumulative_resets
+        return diagnostics
+
     def _update_packet_diagnostics(self, data: bytearray) -> PacketDiagnostics:
         diagnostics = self._packet_tracker.update(
             int(data[0]),
@@ -877,6 +888,20 @@ class EmotivEpocX(EmotivBase):
             decrypted = self.decrypt_data(normalized)
             if not self.is_eeg_packet(decrypted):
                 return
+            # The packet log keeps every EEG report, repeats included, as the
+            # raw record of what the headset sent.
+            if log_writer:
+                self.log_decrypted_packet(log_writer, decrypted)
+                logged_packets += 1
+                if logged_packets == 1:
+                    print("Received first valid decrypted packet.", file=sys.stderr, flush=True)
+                if logged_packets % self.LOG_FLUSH_INTERVAL == 0:
+                    log_handle.flush()
+            # A byte-identical repeat of the previous report is an extra copy,
+            # not a new sample: count it, but do not publish it.
+            if self._repeats.is_repeat(decrypted):
+                loss_reporter.report(self._skip_repeated_packet(decrypted))
+                return
             # Packets consumed during startup are historical samples.  They
             # are still published, but must not seed the live-arrival rate
             # monitor or its stopwatch; doing so counts the startup buffer as
@@ -901,13 +926,6 @@ class EmotivEpocX(EmotivBase):
                     self.decode_debug_sample(decrypted),
                     timestamp=timestamp,
                 )
-            if log_writer:
-                self.log_decrypted_packet(log_writer, decrypted)
-                logged_packets += 1
-                if logged_packets == 1:
-                    print("Received first valid decrypted packet.", file=sys.stderr, flush=True)
-                if logged_packets % self.LOG_FLUSH_INTERVAL == 0:
-                    log_handle.flush()
 
         try:
             # Reports consumed while confirming the key are still real samples.

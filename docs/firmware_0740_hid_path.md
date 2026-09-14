@@ -192,10 +192,41 @@ one-second range for the configured EEG rate (0..127 at 128 Hz or 0..255 at
 On firmware 0x720, a 128 Hz capture (`data/legacy_packets.csv`) confirms the
 counter format. It holds 10,032 reports, all EEG (byte 1 is always `0x10`).
 The counter steps by one and wraps 127 → 0, with no missing reports. It does
-contain 5 byte-identical repeats, which are flagged as duplicates. 256 Hz has
+contain 5 byte-identical repeats (see "Repeated reports" below). 256 Hz has
 not been captured on 0x720. If the legacy reader sees a counter above 127
 while declaring 128 Hz, it warns that `--sample-rate 256` is needed and
 switches to a 0..255 counter instead of failing.
+
+### Repeated reports
+
+Both firmware generations occasionally deliver the previous report a second
+time, byte for byte. The rates were:
+
+| Recording | Repeats | Reports |
+|---|---|---|
+| 0x720 packet log | 5 | 10,032 |
+| 0x740 XDF recordings | 3 and 7 | about 3,900 each (30 s) |
+
+The copy is an extra report, not a replacement for a lost sample:
+
+* The counter never skips around it; it runs 19, 20, 20, 21.
+* Fitting arrival times against the counter gives 128.066 Hz in both 0x740
+  recordings with repeats removed. Counting every report gives 128.165 and
+  128.313 Hz, rising with the number of repeats.
+* Every repeat arrived about 11 ms after the previous report instead of the
+  usual 8 ms. The next new report followed less than 1 ms later.
+
+Publishing a repeat inserts a fake sample and shifts every later sample by one
+period for anything that indexes by sample count. Both EPOC X readers therefore
+drop a report that is identical to the one before it. They cannot confuse two
+real samples this way, because the counter makes consecutive real samples
+differ. A dropped repeat still counts as one entry in `CUMULATIVE_GAPS` with
+no missing reports. The repeat itself is not published, so its `GAP_FLAG` is
+set on the next published sample. The console prints `dropped a repeated
+report`. The `--log-decrypted` CSV still contains every report, repeats
+included.
+
+### Other discontinuities
 
 The counter fields identify skipped or duplicated reports;
 the captured baseline packet used when a session restarts is reported with
