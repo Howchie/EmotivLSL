@@ -123,6 +123,10 @@ Interface discovery is firmware-independent for the same reason:
   from a timed read even when the blocking call receives EEG reports. The
   firmware-0x740 stream continues to use timed reads so an idle headset does
   not block startup.
+* `--firmware legacy` preserves the original startup path: it opens the
+  preferred EEG collection directly and skips the newer timed discovery and
+  key-verification probes. It uses the configured 128 Hz fallback unless
+  `--sample-rate` is supplied explicitly.
 * `python main.py --list-hid` prints every HID interface the operating system
   reports, which is the first thing to check when a headset is not recognized.
 

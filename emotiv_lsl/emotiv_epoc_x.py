@@ -381,6 +381,20 @@ class EmotivEpocX(EmotivBase):
             )
             return []
 
+        if self.firmware_mode == 'legacy':
+            # Keep the forced legacy path free of timed HID reads.  The old
+            # reader advertised the configured 128 Hz fallback and immediately
+            # entered its blocking stream loop; callers with a 256 Hz legacy
+            # headset can still select it with --sample-rate 256.
+            self.set_counter_rate()
+            print(
+                f'Using legacy EPOC X sample rate fallback {self.sample_rate:g} Hz; '
+                'pass --sample-rate to override.',
+                file=sys.stderr,
+                flush=True,
+            )
+            return []
+
         packets: list[list[int]] = []
         started: float | None = None
         last = 0.0
@@ -479,6 +493,24 @@ class EmotivEpocX(EmotivBase):
         Returns the reports consumed while confirming the choice so the caller
         can publish them instead of discarding them.
         """
+        if self.firmware_mode == 'legacy':
+            # The forced legacy mode is intentionally the pre-0x740 startup
+            # path: derive the serial key and begin reading immediately.  A
+            # timed verification read is not useful here because this HID
+            # collection may only deliver reports through the legacy blocking
+            # read used by the original reader.
+            self.packet_xor = self.LEGACY_PACKET_XOR
+            self.cipher = AES.new(self.get_crypto_key(device), AES.MODE_ECB)
+            self.firmware_version = 0
+            self.decryption_path = 'legacy'
+            self.set_counter_format('legacy')
+            print(
+                'Using legacy EPOC X HID decryption (forced; no startup probe).',
+                file=sys.stderr,
+                flush=True,
+            )
+            return []
+
         candidates = self.candidate_ciphers(hid_device, device)
         if not candidates:
             raise RuntimeError(
@@ -630,6 +662,38 @@ class EmotivEpocX(EmotivBase):
 
         self.print_hid_devices(devices)
         candidates = sorted(devices, key=self.probe_priority)
+
+        # A forced legacy launch is the compatibility path used before the
+        # firmware-0x740 support was added.  Do not run the newer timed probe
+        # against that headset: on some older Windows HID stacks the probe can
+        # leave the input collection silent after it is closed and reopened.
+        # Selecting and opening the EEG collection directly preserves the
+        # original legacy startup sequence.
+        if self.firmware_mode == 'legacy':
+            for device in candidates:
+                hid_device = hid.device()
+                try:
+                    hid_device.open_path(device['path'])
+                except Exception as exc:
+                    print(
+                        f"Could not open Emotiv HID interface ({self.describe_hid_device(device)}): {exc}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    continue
+                print(
+                    'Using legacy Emotiv HID interface directly: '
+                    f'{self.describe_hid_device(device)}',
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return device, hid_device
+
+            raise RuntimeError(
+                'No Emotiv HID interface could be opened. Interfaces seen: '
+                + '; '.join(self.describe_hid_device(device) for device in candidates)
+            )
+
         # A silent probe is not proof that the collection is unusable.  In
         # particular, a pre-0x740 headset can begin delivering reports only
         # after the probe handle has been closed and the collection opened for
