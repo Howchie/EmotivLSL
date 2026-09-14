@@ -604,8 +604,10 @@ class EmotivEpocX(EmotivBase):
         Interfaces are tried best-guess first, and one that cannot be opened or
         stays silent never stops the remaining ones from being tried: Windows
         claims some HID collections for itself and another application may hold
-        one open.  The winning handle is returned still open so the streaming
-        loop does not have to close and reopen the collection.
+        one open.  A collection that produces a report during probing is
+        returned with that handle still open; a silent fallback is closed and
+        reopened for the actual streaming loop because older firmware may not
+        arm its input endpoint until that reopen.
         """
         devices = self.get_hid_devices()
         if not devices:
@@ -613,7 +615,14 @@ class EmotivEpocX(EmotivBase):
 
         self.print_hid_devices(devices)
         candidates = sorted(devices, key=self.probe_priority)
-        fallback = None
+        # A silent probe is not proof that the collection is unusable.  In
+        # particular, a pre-0x740 headset can begin delivering reports only
+        # after the probe handle has been closed and the collection opened for
+        # the actual read loop.  Keep the device description as the fallback,
+        # not its already-probed handle; holding that handle open while probing
+        # another collection can also prevent older firmware from starting its
+        # input endpoint.
+        fallback_device = None
 
         for device in candidates:
             hid_device = hid.device()
@@ -664,18 +673,27 @@ class EmotivEpocX(EmotivBase):
 
             # Candidates are in priority order, so the first interface that
             # opens is the best guess if nothing streams during probing.  A
-            # headset that is on but idle should not be a hard failure.
-            if fallback is None:
-                fallback = (device, hid_device)
-            else:
-                hid_device.close()
+            # headset that is on but idle should not be a hard failure. Close
+            # the probe handle and reopen it below for the real stream.
+            if fallback_device is None:
+                fallback_device = device
+            hid_device.close()
 
-        if fallback is not None:
-            device, hid_device = fallback
+        if fallback_device is not None:
+            device = fallback_device
+            hid_device = hid.device()
+            try:
+                hid_device.open_path(device['path'])
+            except Exception as exc:
+                raise RuntimeError(
+                    'No Emotiv HID interface could be reopened for streaming: '
+                    f'{self.describe_hid_device(device)}: {exc}'
+                ) from exc
             print(
-                'No Emotiv HID interface streamed during probing; continuing with '
-                f'{self.describe_hid_device(device)}. If no EEG follows, power-cycle '
-                'the headset and close any other application reading it.',
+                'No Emotiv HID interface streamed during probing; reopened '
+                f'{self.describe_hid_device(device)} for streaming. If no EEG '
+                'follows, power-cycle the headset and close any other application '
+                'reading it.',
                 file=sys.stderr,
                 flush=True,
             )

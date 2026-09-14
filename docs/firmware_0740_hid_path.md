@@ -114,8 +114,10 @@ Interface discovery is firmware-independent for the same reason:
   another application may hold one - is logged and skipped rather than raising.
 * If nothing streams during probing the best candidate is used anyway, because a
   connected-but-idle headset is not a discovery failure.
-* The probed handle stays open into the streaming loop, so the collection is no
-  longer closed and reopened between probing and streaming.
+* When probing sees an EEG report, that handle stays open into the streaming
+  loop. If a collection is silent during probing, its probe handle is closed
+  and the preferred fallback is reopened for streaming; older firmware may
+  not arm its input endpoint until that reopen.
 * `python main.py --list-hid` prints every HID interface the operating system
   reports, which is the first thing to check when a headset is not recognized.
 
