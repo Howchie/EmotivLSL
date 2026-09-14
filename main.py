@@ -32,7 +32,7 @@ def main() -> None:
         default='auto',
         help=(
             'HID decryption path: auto detects and confirms it from the headset '
-            '(default), legacy forces the pre-0x740 serial-derived key, 0740 '
+            '(default), legacy runs the unmodified pre-0x740 reader, 0740 '
             'forces the feature-report key'
         ),
     )

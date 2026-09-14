@@ -24,9 +24,9 @@ Connect dongle, turn on the headset, wait for the light from two indicators
 On Windows, `run.bat` (or the explicit `run_epochX.bat`) launches the EPOC X
 EEG and Cortex LSL streams with the repository's configured developer
 credentials.  `run_flex.bat` launches the original EPOC Flex 1.0 path.
-`run_epochX_legacy.bat` is the same EPOC X launcher pinned to the pre-0x740
-decryption path; it is only needed if automatic firmware detection picks
-wrong.
+`run_epochX_legacy.bat` is the same EPOC X launcher, but it runs the unmodified
+pre-0x740 HID reader. Use it for headsets on firmware older than 0x740 (for
+example 0x720): automatic detection does not currently stream from them.
 
 ```
 # frist terminal
@@ -135,10 +135,16 @@ on the manufacturer string *or* the receiver's vendor id (Windows does not
 always report the former), the most likely EEG collection is probed first, and
 an interface that cannot be opened or stays silent no longer aborts the run.
 
-Override the automatic choice only if it picks wrong:
+Automatic detection does not currently stream from 0x720 headsets: the stream
+opens but carries no samples. For firmware older than 0x740, use
+`--firmware legacy`. It runs the frozen pre-0x740 reader
+(`emotiv_lsl/emotiv_epoc_x_legacy.py`) with none of the newer discovery,
+feature-report, key-verification or rate-measurement steps. That reader
+declares 128 Hz unless you pass `--sample-rate`.
 
 ```bash
-python -m pipenv run python main.py --firmware legacy   # force the pre-0x740 key
+python -m pipenv run python main.py --firmware legacy   # unmodified pre-0x740 reader
+python -m pipenv run python main.py --firmware legacy --sample-rate 256
 python -m pipenv run python main.py --firmware 0740     # force the feature-report key
 ```
 

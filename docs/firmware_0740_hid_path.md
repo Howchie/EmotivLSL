@@ -99,9 +99,22 @@ This matters because the feature query is not a reliable firmware oracle. Older
 firmware may not answer it, may answer without the marker, or may answer with
 something that parses as a high firmware number. Any of those previously routed
 an older headset down the `0x740` path or aborted the run; the counter check now
-corrects the choice instead. `--firmware legacy` and `--firmware 0740` pin the
-path when the automatic choice has to be overridden, and
-`run_epochX_legacy.bat` applies the former on Windows.
+corrects the choice instead. `--firmware 0740` pins the feature-report key.
+
+`--firmware legacy` (`run_epochX_legacy.bat` on Windows) does not use any of
+this. It hands the session to `emotiv_lsl/emotiv_epoc_x_legacy.py`, a frozen
+copy of the reader from before 0x740 support (commit `9944584`). That reader
+matches interfaces on `manufacturer_string == 'Emotiv'` and probes them in
+enumeration order. It closes the probed handle and reopens it, takes the key
+from the serial number, and publishes every 32-byte report. It never queries
+the feature report, verifies the key, measures the rate or filters packets.
+The only change from the original is that its outlets declare
+`--sample-rate` when one is given, and `config.SRATE` otherwise.
+
+Automatic detection does not currently stream from a 0x720 headset. The
+reader opens the stream, but it contains no samples and the rate measurement
+falls back to 128 Hz. Use `--firmware legacy` for 0x720 headsets until that is
+fixed.
 
 Interface discovery is firmware-independent for the same reason:
 
@@ -114,19 +127,8 @@ Interface discovery is firmware-independent for the same reason:
   another application may hold one - is logged and skipped rather than raising.
 * If nothing streams during probing the best candidate is used anyway, because a
   connected-but-idle headset is not a discovery failure.
-* When probing sees an EEG report, that handle stays open into the streaming
-  loop. If a collection is silent during probing, its probe handle is closed
-  and the preferred fallback is reopened for streaming; older firmware may
-  not arm its input endpoint until that reopen.
-* The established pre-0x740 stream uses hidapi's blocking read, matching the
-  original reader. Some older Windows HID collections return empty results
-  from a timed read even when the blocking call receives EEG reports. The
-  firmware-0x740 stream continues to use timed reads so an idle headset does
-  not block startup.
-* `--firmware legacy` preserves the original startup path: it opens the
-  preferred EEG collection directly and skips the newer timed discovery and
-  key-verification probes. It uses the configured 128 Hz fallback unless
-  `--sample-rate` is supplied explicitly.
+* The probed handle stays open into the streaming loop, so the collection is no
+  longer closed and reopened between probing and streaming.
 * `python main.py --list-hid` prints every HID interface the operating system
   reports, which is the first thing to check when a headset is not recognized.
 

@@ -16,6 +16,7 @@ from emotiv_lsl.emotiv_base import (
     SampleRateMonitor,
     make_packet_diagnostics_stream_info,
 )
+from emotiv_lsl.emotiv_epoc_x_legacy import EmotivEpocXLegacy
 from config import SRATE
 
 
@@ -598,31 +599,14 @@ class EmotivEpocX(EmotivBase):
                 return len(packet), observed_lengths
         return None, observed_lengths
 
-    def read_stream_report(self, hid_device):
-        """Read one report using the mode supported by the selected firmware.
-
-        The original legacy reader used hidapi's blocking ``read`` call.  Some
-        older Windows HID collections return an empty list from
-        ``read(..., timeout_ms=...)`` even though the same collection delivers
-        reports through the blocking API. Keep discovery and startup probes
-        timed, but restore the blocking read for an established legacy stream.
-        Firmware 0x740 retains the timed read so an idle headset can be
-        detected without hanging the loop.
-        """
-        if self.decryption_path == 'legacy':
-            return hid_device.read(self.READ_SIZE)
-        return hid_device.read(self.READ_SIZE, timeout_ms=1000)
-
     def open_streaming_hid_device(self):
         """Open the Emotiv interface that actually carries EEG reports.
 
         Interfaces are tried best-guess first, and one that cannot be opened or
         stays silent never stops the remaining ones from being tried: Windows
         claims some HID collections for itself and another application may hold
-        one open.  A collection that produces a report during probing is
-        returned with that handle still open; a silent fallback is closed and
-        reopened for the actual streaming loop because older firmware may not
-        arm its input endpoint until that reopen.
+        one open.  The winning handle is returned still open so the streaming
+        loop does not have to close and reopen the collection.
         """
         devices = self.get_hid_devices()
         if not devices:
@@ -630,15 +614,7 @@ class EmotivEpocX(EmotivBase):
 
         self.print_hid_devices(devices)
         candidates = sorted(devices, key=self.probe_priority)
-
-        # A silent probe is not proof that the collection is unusable.  In
-        # particular, a pre-0x740 headset can begin delivering reports only
-        # after the probe handle has been closed and the collection opened for
-        # the actual read loop.  Keep the device description as the fallback,
-        # not its already-probed handle; holding that handle open while probing
-        # another collection can also prevent older firmware from starting its
-        # input endpoint.
-        fallback_device = None
+        fallback = None
 
         for device in candidates:
             hid_device = hid.device()
@@ -689,27 +665,18 @@ class EmotivEpocX(EmotivBase):
 
             # Candidates are in priority order, so the first interface that
             # opens is the best guess if nothing streams during probing.  A
-            # headset that is on but idle should not be a hard failure. Close
-            # the probe handle and reopen it below for the real stream.
-            if fallback_device is None:
-                fallback_device = device
-            hid_device.close()
+            # headset that is on but idle should not be a hard failure.
+            if fallback is None:
+                fallback = (device, hid_device)
+            else:
+                hid_device.close()
 
-        if fallback_device is not None:
-            device = fallback_device
-            hid_device = hid.device()
-            try:
-                hid_device.open_path(device['path'])
-            except Exception as exc:
-                raise RuntimeError(
-                    'No Emotiv HID interface could be reopened for streaming: '
-                    f'{self.describe_hid_device(device)}: {exc}'
-                ) from exc
+        if fallback is not None:
+            device, hid_device = fallback
             print(
-                'No Emotiv HID interface streamed during probing; reopened '
-                f'{self.describe_hid_device(device)} for streaming. If no EEG '
-                'follows, power-cycle the headset and close any other application '
-                'reading it.',
+                'No Emotiv HID interface streamed during probing; continuing with '
+                f'{self.describe_hid_device(device)}. If no EEG follows, power-cycle '
+                'the headset and close any other application reading it.',
                 file=sys.stderr,
                 flush=True,
             )
@@ -809,64 +776,16 @@ class EmotivEpocX(EmotivBase):
     def log_decrypted_packet(self, writer: csv.writer, data: bytearray) -> None:
         writer.writerow(list(data))
 
-    def legacy_main_loop(self):
-        """Run the pre-firmware-0x740 reader without the new startup pipeline.
-
-        This is intentionally kept structurally identical to the original
-        EPOC X loop: create the EEG outlet, open the usage-2 collection, use a
-        blocking 32-byte read, validate the raw report length, decrypt with the
-        serial-derived key, and push the decoded sample.  In particular, do
-        not probe, measure, filter, timestamp, or run packet diagnostics here;
-        those additions are exactly what the legacy compatibility mode must
-        avoid while we verify the old device path.
-        """
-        eeg_outlet = StreamOutlet(self.get_stream_info())
-        debug_outlet = StreamOutlet(self.get_debug_stream_info()) if self.emit_debug else None
-
-        log_handle = None
-        log_writer = None
-        if self.packet_log_path:
-            self.packet_log_path.parent.mkdir(parents=True, exist_ok=True)
-            log_handle = self.packet_log_path.open('w', newline='')
-            log_writer = csv.writer(log_handle)
-            log_writer.writerow([f'byte_{i}' for i in range(self.READ_SIZE)])
-
-        device = self.get_hid_device()
-        self.packet_xor = self.LEGACY_PACKET_XOR
-        self.cipher = AES.new(self.get_crypto_key(device), AES.MODE_ECB)
-        self.firmware_version = 0
-        self.decryption_path = 'legacy'
-
-        hid_device = hid.device()
-        hid_device.open_path(device['path'])
-        print(
-            f'Streaming from {self.describe_hid_device(device)} '
-            '(literal pre-0x740 compatibility loop)',
-            file=sys.stderr,
-            flush=True,
-        )
-
-        try:
-            while True:
-                encrypted = hid_device.read(self.READ_SIZE)
-                if not self.validate_data(encrypted):
-                    continue
-
-                decrypted = self.decrypt_data(encrypted)
-                eeg_outlet.push_sample(self.decode_eeg_sample(decrypted))
-
-                if debug_outlet:
-                    debug_outlet.push_sample(self.decode_debug_sample(decrypted))
-                if log_writer:
-                    self.log_decrypted_packet(log_writer, decrypted)
-        finally:
-            hid_device.close()
-            if log_handle:
-                log_handle.close()
-
     def main_loop(self):
         if self.firmware_mode == 'legacy':
-            return self.legacy_main_loop()
+            # Hand the whole session to the frozen pre-0x740 reader. None of the
+            # discovery, feature-report, verification or rate-measurement steps
+            # below run for legacy headsets.
+            return EmotivEpocXLegacy(
+                emit_debug=self.emit_debug,
+                packet_log_path=self.packet_log_path,
+                sample_rate=self.requested_sample_rate,
+            ).main_loop()
 
         log_handle = None
         log_writer = None
@@ -935,7 +854,7 @@ class EmotivEpocX(EmotivBase):
                 publish(normalized, monitor_rate=False)
 
             while True:
-                encrypted = self.read_stream_report(hid_device)
+                encrypted = hid_device.read(self.READ_SIZE, timeout_ms=1000)
                 if not encrypted:
                     # A read timeout, not a malformed report: the headset is
                     # connected but idle.
