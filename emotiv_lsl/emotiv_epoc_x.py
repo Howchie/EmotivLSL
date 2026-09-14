@@ -29,7 +29,13 @@ class EmotivEpocX(EmotivBase):
     LOG_FLUSH_INTERVAL = 256
     PROBE_READ_ATTEMPTS = 8
     PROBE_TIMEOUT_MS = 250
+    # The wire counter runs over one second of samples: 0..127 at 128 Hz and
+    # 0..255 at 256 Hz. Keep the fallback value here until the measured or
+    # configured rate is available; the startup path selects the correct
+    # modulus before any buffered samples are published.
     PACKET_COUNTER_MODULUS = 1 << 8
+    LEGACY_PACKET_COUNTER_MODULUS = 1 << 7
+    FW740_PACKET_COUNTER_MODULUS = 1 << 8
     PACKET_DIAGNOSTICS_NAME = "Epoc X Packet Diagnostics"
     EMOTIV_VENDOR_ID = 0x1234
     EMOTIV_PRODUCT_IDS = (0xED02,)
@@ -86,11 +92,58 @@ class EmotivEpocX(EmotivBase):
         self.cipher = None
         self.firmware_version = None
         self.decryption_path = None
+        self.PACKET_COUNTER_MODULUS = self.counter_modulus_for_rate(self.sample_rate)
         self._packet_tracker = PacketCounterTracker(self.PACKET_COUNTER_MODULUS)
         self._last_packet_diagnostics: PacketDiagnostics | None = None
         self.packet_gaps = 0
         self.missing_reports = 0
         self.packet_resets = 0
+
+    @classmethod
+    def counter_modulus_for_rate(cls, rate: float) -> int:
+        """Return the one-second packet-counter modulus for a nominal rate."""
+
+        nearest = min(cls.SUPPORTED_SAMPLE_RATES, key=lambda value: abs(value - rate))
+        return int(nearest)
+
+    def set_counter_format(self, path: str) -> None:
+        """Select the counter format after the HID cipher is confirmed."""
+
+        # Both firmware generations use a one-second counter cycle. The
+        # configured/fallback rate is used until startup measurement completes.
+        self.PACKET_COUNTER_MODULUS = self.counter_modulus_for_rate(self.sample_rate)
+        self._packet_tracker = PacketCounterTracker(self.PACKET_COUNTER_MODULUS)
+        self._last_packet_diagnostics = None
+        self.packet_gaps = 0
+        self.missing_reports = 0
+        self.packet_resets = 0
+
+    def set_counter_rate(self) -> None:
+        """Apply the measured/configured rate to packet diagnostics."""
+
+        self.PACKET_COUNTER_MODULUS = self.counter_modulus_for_rate(self.sample_rate)
+        self._packet_tracker = PacketCounterTracker(self.PACKET_COUNTER_MODULUS)
+        self._last_packet_diagnostics = None
+        self.packet_gaps = 0
+        self.missing_reports = 0
+        self.packet_resets = 0
+
+    def is_eeg_packet(self, data: bytearray) -> bool:
+        """Return whether a decrypted report contains an EEG sample.
+
+        On the legacy protocol, the high counter bit identifies the battery /
+        status half of the report stream.  Those reports are valid HID input,
+        but they are not EEG samples and must not affect the LSL rate or packet
+        loss accounting. Firmware 0x740 uses the full one-second counter range
+        at the selected rate (0..127 at 128 Hz, 0..255 at 256 Hz).
+        """
+
+        if (
+            self.decryption_path == 'legacy'
+            and self.PACKET_COUNTER_MODULUS == self.LEGACY_PACKET_COUNTER_MODULUS
+        ):
+            return int(data[0]) < self.LEGACY_PACKET_COUNTER_MODULUS
+        return True
 
     @classmethod
     def is_emotiv_device(cls, device: dict) -> bool:
@@ -314,11 +367,13 @@ class EmotivEpocX(EmotivBase):
     def measure_sample_rate(self, hid_device) -> list[list[int]]:
         """Time incoming reports and set ``self.sample_rate`` from the result.
 
-        Returns the packets consumed while measuring so the caller can publish
-        them; nothing read here is discarded.
+        Returns the EEG packets consumed while measuring so the caller can
+        publish them. Non-EEG HID reports, when present on the legacy path,
+        are consumed but intentionally not returned.
         """
 
         if self.requested_sample_rate:
+            self.set_counter_rate()
             print(
                 f'Using configured EPOC X sample rate {self.sample_rate:g} Hz.',
                 file=sys.stderr,
@@ -345,6 +400,12 @@ class EmotivEpocX(EmotivBase):
             normalized = self.normalize_encrypted_packet(report)
             if normalized is None:
                 continue
+            # HID input can contain non-EEG reports on the legacy protocol.
+            # They are deliberately consumed here but are not samples to
+            # publish or include in the rate estimate.
+            decrypted = self.decrypt_data(normalized)
+            if not self.is_eeg_packet(decrypted):
+                continue
             last = time.monotonic()
             if started is None:
                 started = last
@@ -352,6 +413,7 @@ class EmotivEpocX(EmotivBase):
 
         elapsed = (last - started) if started is not None else 0.0
         if len(packets) < self.SAMPLE_RATE_MIN_PACKETS or elapsed <= 0:
+            self.set_counter_rate()
             print(
                 f'Could not measure the EPOC X sample rate ({len(packets)} report(s) in '
                 f'{elapsed:.2f}s); assuming {self.sample_rate:g} Hz. '
@@ -364,6 +426,7 @@ class EmotivEpocX(EmotivBase):
         measured = (len(packets) - 1) / elapsed
         nearest = min(self.SUPPORTED_SAMPLE_RATES, key=lambda rate: abs(rate - measured))
         if abs(measured - nearest) / nearest > self.SAMPLE_RATE_TOLERANCE:
+            self.set_counter_rate()
             print(
                 f'Measured EPOC X report rate {measured:.1f} Hz is not close to '
                 f"{' or '.join(f'{rate:g}' for rate in self.SUPPORTED_SAMPLE_RATES)} Hz; "
@@ -374,6 +437,7 @@ class EmotivEpocX(EmotivBase):
             return packets
 
         self.sample_rate = nearest
+        self.set_counter_rate()
         print(
             f'Measured EPOC X sample rate {measured:.1f} Hz -> declaring {nearest:g} Hz.',
             file=sys.stderr,
@@ -381,21 +445,32 @@ class EmotivEpocX(EmotivBase):
         )
         return packets
 
-    def count_counter_steps(self, packets, packet_xor: int, cipher) -> int:
+    def count_counter_steps(
+        self,
+        packets,
+        packet_xor: int,
+        cipher,
+        *,
+        modulus: int | None = None,
+        eeg_only: bool = False,
+    ) -> int:
         """Count consecutive reports whose decrypted counter advances by one.
 
         With the right key the EPOC X counter increments every report; with the
         wrong key byte 0 is effectively random, so this separates the two
         candidates without needing to interpret the EEG payload.
         """
+        modulus = modulus or self.PACKET_COUNTER_MODULUS
         counters = [
             cipher.decrypt(bytearray(el ^ packet_xor for el in packet))[0]
             for packet in packets
         ]
+        if eeg_only:
+            counters = [counter for counter in counters if counter < modulus]
         return sum(
             1
             for previous, current in zip(counters, counters[1:])
-            if (current - previous) % self.PACKET_COUNTER_MODULUS == 1
+            if (current - previous) % modulus == 1
         )
 
     def configure_cipher(self, hid_device, device: dict) -> list[list[int]]:
@@ -414,10 +489,18 @@ class EmotivEpocX(EmotivBase):
 
         packets = self.collect_verification_packets(hid_device)
         pairs = max(0, len(packets) - 1)
-        scores = [
-            self.count_counter_steps(packets, packet_xor, cipher)
-            for _, packet_xor, cipher in candidates
-        ]
+        scores = []
+        for name, packet_xor, cipher in candidates:
+            modulus = self.counter_modulus_for_rate(self.sample_rate)
+            scores.append(
+                self.count_counter_steps(
+                    packets,
+                    packet_xor,
+                    cipher,
+                    modulus=modulus,
+                    eeg_only=name == 'legacy',
+                )
+            )
         # max() keeps the first maximum, so a tie leaves the preferred
         # candidate in place.
         best_index = max(range(len(candidates)), key=scores.__getitem__)
@@ -440,6 +523,7 @@ class EmotivEpocX(EmotivBase):
         self.packet_xor = packet_xor
         self.cipher = cipher
         self.decryption_path = name
+        self.set_counter_format(name)
         print(
             f'Using {name} EPOC X HID decryption ({confirmation}).',
             file=sys.stderr,
@@ -614,10 +698,10 @@ class EmotivEpocX(EmotivBase):
         counter = int(data[0])
         if previous is None or counter != 0:
             return False
-        # A normal 8-bit wrap is 255 -> 0.  The captured EPOC X restart packet
-        # arrived from a substantially later counter and parked every channel
-        # on the ADC midpoint, so require both features before calling it a
-        # reset.
+        # A normal wrap is the last value in the selected counter format -> 0.
+        # The captured EPOC X restart packet arrived from a substantially later
+        # counter and parked every channel on the ADC midpoint, so require both
+        # features before calling it a reset.
         if previous >= self.PACKET_COUNTER_MODULUS - 4:
             return False
         return self.is_baseline_packet(data)
@@ -647,6 +731,8 @@ class EmotivEpocX(EmotivBase):
 
     def decode_data(self, data) -> list:
         data = self.decrypt_data(data)
+        if not self.is_eeg_packet(data):
+            raise ValueError('decrypted HID report does not contain an EEG sample')
         self._update_packet_diagnostics(data)
         return self.decode_eeg_sample(data)
 
@@ -714,10 +800,18 @@ class EmotivEpocX(EmotivBase):
         rate_monitor = SampleRateMonitor('Epoc X', self.sample_rate)
         print(f"Streaming from {self.describe_hid_device(device)}", file=sys.stderr, flush=True)
 
-        def publish(normalized) -> None:
-            rate_monitor.observe()
+        def publish(normalized, *, monitor_rate: bool = True) -> None:
             nonlocal logged_packets
             decrypted = self.decrypt_data(normalized)
+            if not self.is_eeg_packet(decrypted):
+                return
+            # Packets consumed during startup are historical samples.  They
+            # are still published, but must not seed the live-arrival rate
+            # monitor or its stopwatch; doing so counts the startup buffer as
+            # if it arrived instantaneously and produces false rates such as
+            # 195 Hz for a 128 Hz headset.
+            if monitor_rate:
+                rate_monitor.observe()
             diagnostics = self._update_packet_diagnostics(decrypted)
             loss_reporter.report(diagnostics)
             timestamp = local_clock()
@@ -746,7 +840,7 @@ class EmotivEpocX(EmotivBase):
         try:
             # Reports consumed while confirming the key are still real samples.
             for normalized in buffered:
-                publish(normalized)
+                publish(normalized, monitor_rate=False)
 
             while True:
                 encrypted = hid_device.read(self.READ_SIZE, timeout_ms=1000)

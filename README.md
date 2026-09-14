@@ -337,7 +337,8 @@ This repo publishes the 14 EEG channels and an always-on `Epoc X Packet
 Diagnostics` stream. Counter discontinuities are also summarized on the console
 (the first one immediately, then at most once every ten seconds) so packet loss
 is visible without an LSL consumer attached. The diagnostics stream is timestamped alongside the EEG
-samples and includes the decrypted 8-bit packet counter, expected counter,
+samples and includes the decrypted packet counter (0..127 at 128 Hz or
+0..255 at 256 Hz), expected counter,
 per-sample gap/reset flags, and cumulative loss/reset counts. A gap flag marks
 the first received sample after a counter discontinuity; it does not alter the
 EEG values. Use those fields to mark or reject short acquisition windows in

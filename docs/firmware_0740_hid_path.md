@@ -122,10 +122,11 @@ Interface discovery is firmware-independent for the same reason:
 ## Sample rate
 
 EPOC X runs at either 128 Hz or 256 Hz depending on how the headset is
-configured, and nothing in the HID report distinguishes them: the packet
-counter increments once per report at either rate. The reader therefore times
-incoming reports for two seconds after the cipher is confirmed, snaps the
-result to the nearer supported rate, and declares that on every outlet. The
+configured, and nothing in the HID report explicitly labels the rate: the
+packet counter increments once per report and wraps after one second of samples
+(at 127 for 128 Hz, or at 255 for 256 Hz). The reader therefore times incoming
+reports for two seconds after the cipher is confirmed, snaps the result to the
+nearer supported rate, and declares that on every outlet. The
 reports consumed while measuring are published, not dropped, and the stream
 metadata records `sample_rate_source` as `measured` or `configured`.
 
@@ -159,7 +160,8 @@ stream rather than importing the constant.
 ## Packet diagnostics
 
 Each decoded report is also mirrored to an always-on `Epoc X Packet Diagnostics`
-LSL stream. Its 8-bit counter fields identify skipped or duplicated HID reports;
+LSL stream. Its counter fields use the one-second range for the configured EEG
+rate (0..127 at 128 Hz or 0..255 at 256 Hz) and identify skipped or duplicated reports;
 the captured baseline packet used when a session restarts is reported with
 `RESET_FLAG` instead of being counted as packet loss. That baseline report is
 `00 10` followed by the byte pair `00 80` on every channel - the ADC midpoint,

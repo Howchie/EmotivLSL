@@ -140,11 +140,20 @@ class PacketLossReporter:
             return
         self._reported_a_gap = True
         self._next_gap_report = now + self.interval_seconds
+        if diagnostics.missing_reports:
+            message = (
+                f"dropped packets: counter {diagnostics.counter} arrived where "
+                f"{diagnostics.expected_counter} was expected "
+                f"({diagnostics.missing_reports} report(s) missing)"
+            )
+        else:
+            message = (
+                f"packet counter discontinuity: counter {diagnostics.counter} arrived "
+                f"where {diagnostics.expected_counter} was expected "
+                "(duplicate or reordered report; no reports missing)"
+            )
         self._emit(
-            f"dropped packets: counter {diagnostics.counter} arrived where "
-            f"{diagnostics.expected_counter} was expected "
-            f"({diagnostics.missing_reports} report(s) missing); "
-            f"{diagnostics.cumulative_gaps} discontinuity event(s) and "
+            f"{message}; {diagnostics.cumulative_gaps} discontinuity event(s) and "
             f"{diagnostics.cumulative_missing} missing report(s) so far"
         )
 
