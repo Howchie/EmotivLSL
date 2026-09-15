@@ -1,7 +1,11 @@
 import json
+import math
 import sys
+import time
 import tkinter as tk
-from dataclasses import dataclass
+import traceback
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pylsl import StreamInlet, resolve_byprop
@@ -20,6 +24,12 @@ WINDOW_PADDING = 12
 HEADER_HEIGHT = 34
 SENSOR_RADIUS = 17
 RING_RADIUS = 21
+POLL_MS = 100
+# Cortex publishes both quality streams at 2 Hz; radio dropouts that Cortex
+# rides out still leave gaps of a few seconds.
+STALE_SECONDS = 5.0
+NO_DATA_COLOR = "#d84a3a"
+UNKNOWN_OVERALL_COLOR = "#8a8a8a"
 CQ_CHANNEL_ORDER = [
     "Battery",
     "Signal",
@@ -91,12 +101,29 @@ class SensorGlyph:
     ring_id: int
 
 
+@dataclass
+class QualityStream:
+    name: str
+    inlet: StreamInlet
+    panel: "QualityPanel"
+    update: Callable[[list[float]], None]
+    # Counts from connection so a stream that never delivers still goes stale.
+    last_sample_at: float = field(default_factory=time.monotonic)
+    stale: bool = False
+
+
 def score_to_color(score: float) -> str:
+    # The bridge publishes a missing Cortex value as NaN, and int(round(nan))
+    # raises.
+    if not math.isfinite(score):
+        return QUALITY_COLORS[0]
     rounded = max(0, min(4, int(round(score))))
     return QUALITY_COLORS[rounded]
 
 
 def overall_to_color(overall: float) -> str:
+    if not math.isfinite(overall):
+        return UNKNOWN_OVERALL_COLOR
     if overall >= 80:
         return "#8ad448"
     if overall >= 60:
@@ -183,12 +210,14 @@ class QualityPanel:
         self.panel_height = panel_height
         self.sensor_glyphs: dict[str, SensorGlyph] = {}
         self.metric_text_ids: dict[str, int] = {}
+        self.title_id: int | None = None
         self.overall_text_id: int | None = None
         self.overall_background_id: int | None = None
+        self.showing_no_data = False
         self.draw()
 
     def draw(self) -> None:
-        self.canvas.create_text(
+        self.title_id = self.canvas.create_text(
             self.panel_left + self.panel_width / 2,
             20,
             text=self.title,
@@ -250,7 +279,26 @@ class QualityPanel:
     def update_metrics(self, metrics: dict[str, str], overall: float) -> None:
         for key, value in metrics.items():
             self.canvas.itemconfigure(self.metric_text_ids[key], text=value)
-        self.update_overall_badge(f"{overall:.0f}%", overall_to_color(overall))
+        overall_text = f"{overall:.0f}%" if math.isfinite(overall) else "--%"
+        self.update_overall_badge(overall_text, overall_to_color(overall))
+        if self.showing_no_data:
+            self.showing_no_data = False
+            self.canvas.itemconfigure(self.title_id, text=self.title, fill="#23374d")
+
+    def show_no_data(self, seconds: float) -> None:
+        """Replace the last values so a dead stream never looks live."""
+        if not self.showing_no_data:
+            for glyph in self.sensor_glyphs.values():
+                self.canvas.itemconfigure(glyph.oval_id, fill=QUALITY_COLORS[0])
+            for key, label in self.metric_labels:
+                self.canvas.itemconfigure(self.metric_text_ids[key], text=f"{label}: --")
+            self.update_overall_badge("--%", UNKNOWN_OVERALL_COLOR)
+            self.showing_no_data = True
+        self.canvas.itemconfigure(
+            self.title_id,
+            text=f"{self.title}: no data for {seconds:.0f} s",
+            fill=NO_DATA_COLOR,
+        )
 
     def update_overall_badge(self, text: str, color: str) -> None:
         self.canvas.itemconfigure(self.overall_text_id, text=text, fill=color)
@@ -341,47 +389,105 @@ class DualQualityViewer:
             panel_height=self.panel_height,
         )
 
-        self.cq_inlet: StreamInlet | None = None
-        self.eq_inlet: StreamInlet | None = None
+        self.streams: list[QualityStream] = []
+        self.reported_errors: set[str] = set()
 
     def connect(self) -> None:
         self.status_var.set("Resolving LSL quality streams...")
-        cq_streams = resolve_byprop("name", CQ_STREAM_NAME, timeout=2)
-        eq_streams = resolve_byprop("name", EQ_STREAM_NAME, timeout=2)
-        if not cq_streams or not eq_streams:
-            missing = []
-            if not cq_streams:
-                missing.append(CQ_STREAM_NAME)
-            if not eq_streams:
-                missing.append(EQ_STREAM_NAME)
-            self.status_var.set(f"Missing stream(s): {', '.join(missing)}. Retrying...")
+        try:
+            cq_streams = resolve_byprop("name", CQ_STREAM_NAME, timeout=2)
+            eq_streams = resolve_byprop("name", EQ_STREAM_NAME, timeout=2)
+            if not cq_streams or not eq_streams:
+                missing = []
+                if not cq_streams:
+                    missing.append(CQ_STREAM_NAME)
+                if not eq_streams:
+                    missing.append(EQ_STREAM_NAME)
+                self.status_var.set(f"Missing stream(s): {', '.join(missing)}. Retrying...")
+                self.root.after(1000, self.connect)
+                return
+
+            streams = [
+                QualityStream("Contact Quality", StreamInlet(cq_streams[0]), self.cq_panel, self.update_cq),
+                QualityStream("EEG Quality", StreamInlet(eq_streams[0]), self.eq_panel, self.update_eq),
+            ]
+        except Exception as exc:
+            # A failed attempt must not end the retry chain.
+            self.report_error("connecting to the quality streams", exc)
+            self.status_var.set(f"Could not open the quality streams ({exc}). Retrying...")
             self.root.after(1000, self.connect)
             return
 
-        self.cq_inlet = StreamInlet(cq_streams[0])
-        self.eq_inlet = StreamInlet(eq_streams[0])
+        self.streams = streams
         self.status_var.set("Connected to both quality streams")
         self.poll()
 
     def poll(self) -> None:
-        updated = False
-        if self.cq_inlet:
-            while True:
-                sample, _ = self.cq_inlet.pull_sample(timeout=0.0)
-                if sample is None:
-                    break
-                self.update_cq(sample)
-                updated = True
-        if self.eq_inlet:
-            while True:
-                sample, _ = self.eq_inlet.pull_sample(timeout=0.0)
-                if sample is None:
-                    break
-                self.update_eq(sample)
-                updated = True
-        if not updated:
-            self.status_var.set("Connected to both quality streams")
-        self.root.after(100, self.poll)
+        # Tk drops an after() chain whose callback raises, which would leave
+        # the window showing its last values with nothing but a traceback in
+        # the console.  Always schedule the next poll.
+        try:
+            now = time.monotonic()
+            stale = [stream for stream in self.streams if not self.poll_stream(stream, now)]
+            if stale:
+                self.status_var.set(
+                    "; ".join(
+                        f"No {stream.name} samples for {now - stream.last_sample_at:.0f} s"
+                        for stream in stale
+                    )
+                    + ". Values are cleared until samples resume; see the console for Cortex warnings."
+                )
+            else:
+                self.status_var.set("Connected to both quality streams")
+        except Exception as exc:
+            self.report_error("updating the quality display", exc)
+            self.status_var.set(f"Quality display error: {exc}")
+        finally:
+            self.root.after(POLL_MS, self.poll)
+
+    def poll_stream(self, stream: QualityStream, now: float) -> bool:
+        """Show the newest sample, or mark the panel stale; return whether it is live."""
+        sample = None
+        while True:
+            pulled, _ = stream.inlet.pull_sample(timeout=0.0)
+            if pulled is None:
+                break
+            sample = pulled
+        if sample is not None:
+            stream.update(sample)
+            if stream.stale:
+                print(
+                    f"Quality viewer: {stream.name} samples resumed after "
+                    f"{now - stream.last_sample_at:.0f} s",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                stream.stale = False
+            stream.last_sample_at = now
+            return True
+
+        silent = now - stream.last_sample_at
+        if silent < STALE_SECONDS:
+            return True
+        if not stream.stale:
+            stream.stale = True
+            print(
+                f"Quality viewer: no {stream.name} samples for {silent:.0f} s; "
+                "clearing its display until they resume",
+                file=sys.stderr,
+                flush=True,
+            )
+        stream.panel.show_no_data(silent)
+        return False
+
+    def report_error(self, action: str, exc: Exception) -> None:
+        # Print each distinct error once rather than ten times a second.
+        key = f"{action}: {type(exc).__name__}: {exc}"
+        if key in self.reported_errors:
+            return
+        self.reported_errors.add(key)
+        print(f"Quality viewer: error {key}", file=sys.stderr, flush=True)
+        traceback.print_exc()
 
     def update_cq(self, sample: list[float]) -> None:
         self.cq_panel.update_sensor_scores(sample)

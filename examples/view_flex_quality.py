@@ -12,7 +12,9 @@ import argparse
 import json
 import math
 import sys
+import time
 import tkinter as tk
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -43,6 +45,12 @@ HEADER_HEIGHT = 36
 INACTIVE_RADIUS = 5
 SENSOR_RADIUS = 11
 RING_RADIUS = 15
+POLL_MS = 100
+# Cortex publishes both quality streams at 2 Hz; radio dropouts that Cortex
+# rides out still leave gaps of up to ~3 s.
+STALE_SECONDS = 5.0
+INFO_TIMEOUT_SECONDS = 5.0
+NO_DATA_COLOR = "#d84a3a"
 
 QUALITY_COLORS = {
     0: "#111111",
@@ -203,11 +211,17 @@ def channel_labels(info) -> list[str]:
 class QualitySource:
     """Map one Cortex quality inlet's dynamic columns to Flex locations."""
 
-    def __init__(self, inlet: StreamInlet, montage: FlexMontage, kind: str) -> None:
+    def __init__(self, inlet: StreamInlet, montage: FlexMontage, kind: str, name: str) -> None:
         self.inlet = inlet
         self.montage = montage
         self.kind = kind
-        self.labels = channel_labels(inlet.info())
+        self.name = name
+        # The default waits forever, which would hang the window if the outlet
+        # is listed but cannot be reached.
+        self.labels = channel_labels(inlet.info(timeout=INFO_TIMEOUT_SECONDS))
+        # Counts from connection so a stream that never delivers still goes stale.
+        self.last_sample_at = time.monotonic()
+        self.stale = False
         self.indices = {
             normalize_label(label): index
             for index, label in enumerate(self.labels)
@@ -288,8 +302,10 @@ class FlexQualityPanel:
         }
         self.glyphs: dict[str, SensorGlyph] = {}
         self.metric_text_ids: dict[str, int] = {}
+        self.title_id: int | None = None
         self.overall_text_id: int | None = None
         self.overall_background_id: int | None = None
+        self.showing_no_data = False
         self.draw()
 
     def point(self, location: str) -> tuple[float, float]:
@@ -300,7 +316,7 @@ class FlexQualityPanel:
         )
 
     def draw(self) -> None:
-        self.canvas.create_text(
+        self.title_id = self.canvas.create_text(
             self.panel_left + self.panel_width / 2,
             20,
             text=self.title,
@@ -449,6 +465,20 @@ class FlexQualityPanel:
                 text="--%" if overall is None else f"{overall:.0f}%",
                 fill=overall_to_color(overall),
             )
+        if self.showing_no_data:
+            self.showing_no_data = False
+            self.canvas.itemconfigure(self.title_id, text=self.title, fill="#23374d")
+
+    def show_no_data(self, seconds: float) -> None:
+        """Replace the last values so a dead stream never looks live."""
+        if not self.showing_no_data:
+            self.update({}, {})
+            self.showing_no_data = True
+        self.canvas.itemconfigure(
+            self.title_id,
+            text=f"{self.title}: no data for {seconds:.0f} s",
+            fill=NO_DATA_COLOR,
+        )
 
 
 class FlexQualityViewer:
@@ -532,52 +562,113 @@ class FlexQualityViewer:
         )
         self.cq_source: QualitySource | None = None
         self.eq_source: QualitySource | None = None
+        self.reported_errors: set[str] = set()
 
     def connect(self) -> None:
         cq_name = f"{self.stream_prefix} Contact Quality"
         eq_name = f"{self.stream_prefix} EEG Quality"
-        cq_streams = resolve_byprop("name", cq_name, timeout=2)
-        eq_streams = resolve_byprop("name", eq_name, timeout=2)
-        if not cq_streams or not eq_streams:
-            missing = []
-            if not cq_streams:
-                missing.append(cq_name)
-            if not eq_streams:
-                missing.append(eq_name)
-            self.status_var.set(f"Missing stream(s): {', '.join(missing)}. Retrying...")
+        try:
+            cq_streams = resolve_byprop("name", cq_name, timeout=2)
+            eq_streams = resolve_byprop("name", eq_name, timeout=2)
+            if not cq_streams or not eq_streams:
+                missing = []
+                if not cq_streams:
+                    missing.append(cq_name)
+                if not eq_streams:
+                    missing.append(eq_name)
+                self.status_var.set(f"Missing stream(s): {', '.join(missing)}. Retrying...")
+                self.root.after(1000, self.connect)
+                return
+
+            cq_source = QualitySource(StreamInlet(cq_streams[0]), self.montage, "dev", "Contact Quality")
+            eq_source = QualitySource(StreamInlet(eq_streams[0]), self.montage, "eq", "EEG Quality")
+        except Exception as exc:
+            # A failed attempt must not end the retry chain.
+            self.report_error("connecting to the quality streams", exc)
+            self.status_var.set(f"Could not open the quality streams ({exc}). Retrying...")
             self.root.after(1000, self.connect)
             return
 
-        self.cq_source = QualitySource(StreamInlet(cq_streams[0]), self.montage, "dev")
-        self.eq_source = QualitySource(StreamInlet(eq_streams[0]), self.montage, "eq")
+        self.cq_source = cq_source
+        self.eq_source = eq_source
         self.status_var.set(
             f"Connected; active Flex locations: {len(self.montage.mapping)}"
         )
         self.poll()
 
     def poll(self) -> None:
-        updated = False
-        if self.cq_source:
-            while True:
-                sample, _ = self.cq_source.inlet.pull_sample(timeout=0.0)
-                if sample is None:
-                    break
-                scores, metrics = self.cq_source.decode(sample)
-                self.cq_panel.update(scores, metrics)
-                updated = True
-        if self.eq_source:
-            while True:
-                sample, _ = self.eq_source.inlet.pull_sample(timeout=0.0)
-                if sample is None:
-                    break
-                scores, metrics = self.eq_source.decode(sample)
-                self.eq_panel.update(scores, metrics)
-                updated = True
-        if not updated and (self.cq_source or self.eq_source):
-            self.status_var.set(
-                f"Connected; active Flex locations: {len(self.montage.mapping)}"
+        # Tk drops an after() chain whose callback raises, which would leave
+        # the window showing its last values with nothing but a traceback in
+        # the console.  Always schedule the next poll.
+        try:
+            now = time.monotonic()
+            stale = [
+                source
+                for source, panel in ((self.cq_source, self.cq_panel), (self.eq_source, self.eq_panel))
+                if source is not None and not self.poll_source(source, panel, now)
+            ]
+            if stale:
+                self.status_var.set(
+                    "; ".join(
+                        f"No {source.name} samples for {now - source.last_sample_at:.0f} s"
+                        for source in stale
+                    )
+                    + ". Values are cleared until samples resume; see the console for Cortex warnings."
+                )
+            else:
+                self.status_var.set(
+                    f"Connected; active Flex locations: {len(self.montage.mapping)}"
+                )
+        except Exception as exc:
+            self.report_error("updating the quality display", exc)
+            self.status_var.set(f"Quality display error: {exc}")
+        finally:
+            self.root.after(POLL_MS, self.poll)
+
+    def poll_source(self, source: QualitySource, panel: FlexQualityPanel, now: float) -> bool:
+        """Show the newest sample, or mark the panel stale; return whether it is live."""
+        sample = None
+        while True:
+            pulled, _ = source.inlet.pull_sample(timeout=0.0)
+            if pulled is None:
+                break
+            sample = pulled
+        if sample is not None:
+            scores, metrics = source.decode(sample)
+            panel.update(scores, metrics)
+            if source.stale:
+                print(
+                    f"Flex quality viewer: {source.name} samples resumed after "
+                    f"{now - source.last_sample_at:.0f} s",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                source.stale = False
+            source.last_sample_at = now
+            return True
+
+        silent = now - source.last_sample_at
+        if silent < STALE_SECONDS:
+            return True
+        if not source.stale:
+            source.stale = True
+            print(
+                f"Flex quality viewer: no {source.name} samples for {silent:.0f} s; "
+                "clearing its display until they resume",
+                file=sys.stderr,
+                flush=True,
             )
-        self.root.after(100, self.poll)
+        panel.show_no_data(silent)
+        return False
+
+    def report_error(self, action: str, exc: Exception) -> None:
+        # Print each distinct error once rather than ten times a second.
+        key = f"{action}: {type(exc).__name__}: {exc}"
+        if key in self.reported_errors:
+            return
+        self.reported_errors.add(key)
+        print(f"Flex quality viewer: error {key}", file=sys.stderr, flush=True)
+        traceback.print_exc()
 
     def run(self) -> None:
         self.root.after(0, self.connect)

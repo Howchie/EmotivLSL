@@ -7,12 +7,26 @@ import time
 from dataclasses import dataclass
 
 from pylsl import StreamInfo, StreamOutlet, local_clock
-from websocket import WebSocketTimeoutException, create_connection
+from websocket import (
+    WebSocketConnectionClosedException,
+    WebSocketTimeoutException,
+    create_connection,
+)
 
 
 DEFAULT_CORTEX_URL = "wss://localhost:6868"
 DEFAULT_STREAMS = ("dev", "eq")
 POLL_INTERVAL_SECONDS = 1.0
+HEADSET_WAIT_SECONDS = 15.0
+CALL_TIMEOUT_SECONDS = 30.0
+# Cortex drops a headset after 30 s without data and announces it (warning
+# 103).  This watchdog only catches subscriptions that go quiet unannounced.
+STALL_SECONDS = 45.0
+RECONNECT_DELAY_SECONDS = 2.0
+MAX_RECONNECT_DELAY_SECONDS = 30.0
+# Warnings after which a session delivers no more samples: 0 subscriptions
+# cancelled, 1 session closed, 103 headset disconnected for lack of data.
+SESSION_ENDING_WARNINGS = frozenset({0, 1, 103})
 
 
 @dataclass
@@ -61,11 +75,18 @@ class CortexClient:
         sslopt = None if verify_ssl else {"cert_reqs": ssl.CERT_NONE}
         self.ws = create_connection(url, sslopt=sslopt, timeout=10)
         self.next_id = 1
+        # Warnings that arrived while call() was waiting for its reply.
+        self.warnings: list[dict] = []
 
     def close(self) -> None:
         self.ws.close()
 
-    def call(self, method: str, params: dict | None = None) -> dict | list:
+    def call(
+        self,
+        method: str,
+        params: dict | None = None,
+        timeout: float = CALL_TIMEOUT_SECONDS,
+    ) -> dict | list:
         request_id = self.next_id
         self.next_id += 1
         payload = {
@@ -78,8 +99,19 @@ class CortexClient:
 
         self.ws.send(json.dumps(payload))
 
+        # The socket timeout bounds a single read, which is shorter than some
+        # replies take once streaming has set it to one second.
+        deadline = time.monotonic() + timeout
         while True:
-            message = json.loads(self.ws.recv())
+            if time.monotonic() >= deadline:
+                raise CortexError(f"{method} got no reply within {timeout:.0f} s")
+            try:
+                message = self.recv()
+            except WebSocketTimeoutException:
+                continue
+            if "warning" in message:
+                self.warnings.append(message["warning"])
+                continue
             if message.get("id") != request_id:
                 continue
             if "error" in message:
@@ -88,7 +120,16 @@ class CortexClient:
             return message["result"]
 
     def recv(self) -> dict:
-        return json.loads(self.ws.recv())
+        raw = self.ws.recv()
+        if not raw:
+            # websocket-client returns an empty string for a close frame.
+            raise WebSocketConnectionClosedException("Cortex closed the connection")
+        message = json.loads(raw)
+        return message if isinstance(message, dict) else {}
+
+    def take_warnings(self) -> list[dict]:
+        warnings, self.warnings = self.warnings, []
+        return warnings
 
     def settimeout(self, seconds: float) -> None:
         self.ws.settimeout(seconds)
@@ -283,16 +324,19 @@ def query_headsets(client: CortexClient) -> list[dict]:
     return result if isinstance(result, list) else []
 
 
+def describe_headsets(headsets: list[dict]) -> list[str]:
+    return [
+        "INFO| cortex-headset "
+        f"'{index}' (id={headset.get('id')} status={headset.get('status')} "
+        f"connectedBy={headset.get('connectedBy')} mode={headset.get('settings', {}).get('mode')} "
+        f"eegRate={headset.get('settings', {}).get('eegRate')})"
+        for index, headset in enumerate(headsets)
+    ]
+
+
 def print_headsets(headsets: list[dict]) -> None:
-    for index, headset in enumerate(headsets):
-        print(
-            "INFO| cortex-headset "
-            f"'{index}' (id={headset.get('id')} status={headset.get('status')} "
-            f"connectedBy={headset.get('connectedBy')} mode={headset.get('settings', {}).get('mode')} "
-            f"eegRate={headset.get('settings', {}).get('eegRate')})",
-            file=sys.stderr,
-            flush=True,
-        )
+    for line in describe_headsets(headsets):
+        print(line, file=sys.stderr, flush=True)
 
 
 def wait_for_connected_headset(
@@ -301,12 +345,16 @@ def wait_for_connected_headset(
     headset_mappings: dict[str, str] | None = None,
 ) -> dict:
     client.call("controlDevice", {"command": "refresh"})
-    deadline = time.time() + 15
+    deadline = time.monotonic() + HEADSET_WAIT_SECONDS
+    # Print the list only when it changes: a reconnect can wait here repeatedly.
+    printed: list[str] = []
 
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         headsets = query_headsets(client)
-        if headsets:
+        listing = describe_headsets(headsets)
+        if listing and listing != printed:
             print_headsets(headsets)
+            printed = listing
 
         if headset_id:
             matches = [headset for headset in headsets if headset.get("id") == headset_id]
@@ -355,7 +403,9 @@ def close_session(client: CortexClient, token: str, session_id: str) -> None:
                 "status": "close",
             },
         )
-    except CortexError as exc:
+    except Exception as exc:
+        # Runs from cleanup, often because the connection has already failed;
+        # it must not replace the exception that ended the session.
         print(f"close_session warning: {exc}", file=sys.stderr, flush=True)
 
 
@@ -383,85 +433,202 @@ def subscribe_streams(client: CortexClient, token: str, session_id: str, streams
     return subscriptions
 
 
-def run_bridge(config: BridgeConfig) -> None:
-    client = CortexClient(config.cortex_url, verify_ssl=config.verify_ssl)
-    session_id = None
-    token = None
-    # Cortex timestamps are Unix epoch seconds; LSL expects local_clock() timebase.
-    cortex_to_lsl_offset = local_clock() - time.time()
+def describe_warning(warning: dict) -> str:
+    message = warning.get("message")
+    if isinstance(message, dict):
+        details = ", ".join(f"{key}={value}" for key, value in message.items() if key != "behavior")
+        message = message.get("behavior") or ""
+        if details:
+            message = f"{message} ({details})" if message else details
+    return f"Cortex warning {warning.get('code')}: {message}"
 
-    try:
-        get_logged_in_user(client)
-        ensure_access(client, config.client_id, config.client_secret)
-        token = authorize(client, config.client_id, config.client_secret, config.license)
 
-        headset = wait_for_connected_headset(
-            client,
-            config.headset_id,
-            config.headset_mappings,
-        )
-        print(f"Using headset {headset['id']}", file=sys.stderr, flush=True)
+def warning_ends_session(warning: dict, session_id: str, headset_id: str | None) -> bool:
+    """Whether a Cortex warning means this session will deliver no more samples."""
+    if warning.get("code") not in SESSION_ENDING_WARNINGS:
+        return False
+    message = warning.get("message")
+    if not isinstance(message, dict):
+        return True
+    # Warnings about another session or headset (e.g. a second headset in
+    # range) leave this session running.
+    return (
+        message.get("sessionId", session_id) == session_id
+        and message.get("headsetId", headset_id) == headset_id
+    )
 
-        # Cortex requires an activated (licensed) session for raw EEG.  The
-        # existing quality-only default stays unactivated so it remains usable
-        # with a free account.
-        session_status = "active" if "eeg" in config.streams else "open"
-        session_id = open_session(client, token, headset["id"], session_status)
-        subscriptions = subscribe_streams(client, token, session_id, list(config.streams))
 
-        outlets: dict[str, StreamOutlet] = {}
+class CortexBridge:
+    """Publish Cortex streams to LSL and resubscribe whenever Cortex ends the session.
+
+    When Cortex gets no data from a headset for 30 s it disconnects the
+    headset, closes the session and cancels its subscriptions.  The LSL
+    outlets are created once and fed by every later session, so recorders and
+    quality viewers keep the same streams across a reconnect.
+    """
+
+    def __init__(self, config: BridgeConfig) -> None:
+        self.config = config
+        self.headset_id = config.headset_id
+        self.outlets: dict[str, StreamOutlet] = {}
+        self.columns: dict[str, list] = {}
+        self.last_sample_at: float | None = None
+        # Cortex timestamps are Unix epoch seconds; LSL expects local_clock() timebase.
+        self.cortex_to_lsl_offset = local_clock() - time.time()
+
+    def run(self) -> None:
+        delay = RECONNECT_DELAY_SECONDS
+        while True:
+            started = time.monotonic()
+            try:
+                reason = self.run_session()
+            except Exception as exc:
+                if not self.outlets:
+                    # Nothing has been published yet, so this is a setup
+                    # problem (credentials, no headset): fail loudly.
+                    raise
+                reason = f"{type(exc).__name__}: {exc}"
+            if self.last_sample_at is not None and self.last_sample_at > started:
+                delay = RECONNECT_DELAY_SECONDS
+            print(
+                f"Cortex bridge: {reason}; no Cortex samples until a new session starts. "
+                f"Reconnecting in {delay:g} s.",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
+            delay = min(delay * 2, MAX_RECONNECT_DELAY_SECONDS)
+
+    def run_session(self) -> str:
+        """Stream one Cortex session until it ends; return why it ended."""
+        client = CortexClient(self.config.cortex_url, verify_ssl=self.config.verify_ssl)
+        session_id = None
+        token = None
+        try:
+            get_logged_in_user(client)
+            ensure_access(client, self.config.client_id, self.config.client_secret)
+            token = authorize(client, self.config.client_id, self.config.client_secret, self.config.license)
+
+            headset = wait_for_connected_headset(
+                client,
+                self.headset_id,
+                self.config.headset_mappings,
+            )
+            # Later sessions must return to this headset rather than connect
+            # whichever headset Cortex lists first.
+            self.headset_id = headset["id"]
+            print(f"Using headset {headset['id']}", file=sys.stderr, flush=True)
+
+            # Cortex requires an activated (licensed) session for raw EEG.  The
+            # existing quality-only default stays unactivated so it remains usable
+            # with a free account.
+            session_status = "active" if "eeg" in self.config.streams else "open"
+            session_id = open_session(client, token, headset["id"], session_status)
+            subscriptions = subscribe_streams(client, token, session_id, list(self.config.streams))
+            self.ensure_outlets(headset, subscriptions)
+
+            reason, ended_by_cortex = self.pump(client, session_id, subscriptions)
+            if ended_by_cortex:
+                session_id = None
+            return reason
+        finally:
+            if session_id and token and client.ws.connected:
+                close_session(client, token, session_id)
+            try:
+                client.close()
+            except Exception:
+                pass
+
+    def ensure_outlets(self, headset: dict, subscriptions: dict[str, list]) -> None:
         for stream_name, labels in subscriptions.items():
             spec = STREAM_SPECS[stream_name]
             # MARKERS is an array of marker objects and cannot be represented in
             # the numeric EEG outlet.  All other EEG columns are numeric and
             # retain Cortex's documented order.
             publish_labels = [label for label in labels if not (stream_name == "eeg" and label == "MARKERS")]
+            if stream_name in self.outlets:
+                if publish_labels != self.columns[stream_name]:
+                    raise CortexError(
+                        f"{stream_name} columns changed after resubscribing "
+                        f"(published {self.columns[stream_name]!r}, now {publish_labels!r}); "
+                        "restart the bridge"
+                    )
+                continue
             rate = eeg_nominal_rate(headset) if stream_name == "eeg" else None
-            lsl_name = stream_lsl_name(spec, config.stream_prefix)
-            outlets[stream_name] = create_outlet(
+            lsl_name = stream_lsl_name(spec, self.config.stream_prefix)
+            self.outlets[stream_name] = create_outlet(
                 spec,
                 publish_labels,
                 nominal_srate=rate,
                 lsl_name=lsl_name,
             )
+            self.columns[stream_name] = publish_labels
             print(
                 f"Publishing {stream_name} as LSL '{lsl_name}' with columns {publish_labels!r}",
                 file=sys.stderr,
                 flush=True,
             )
 
+    def pump(
+        self,
+        client: CortexClient,
+        session_id: str,
+        subscriptions: dict[str, list],
+    ) -> tuple[str, bool]:
+        """Publish samples until the session ends.
+
+        Returns why it ended and whether Cortex ended it (so it needs no close).
+        """
         client.settimeout(1.0)
+        last_data = time.monotonic()
         while True:
             try:
                 message = client.recv()
             except WebSocketTimeoutException:
+                message = {}
+
+            warnings = client.take_warnings()
+            if "warning" in message:
+                warnings.append(message["warning"])
+            for warning in warnings:
+                print(describe_warning(warning), file=sys.stderr, flush=True)
+                if warning_ends_session(warning, session_id, self.headset_id):
+                    return f"Cortex ended the session (warning {warning.get('code')})", True
+
+            if self.publish(message, subscriptions):
+                last_data = self.last_sample_at = time.monotonic()
+            elif time.monotonic() - last_data > STALL_SECONDS:
+                return f"no samples from Cortex for {STALL_SECONDS:.0f} s", False
+
+    def publish(self, message: dict, subscriptions: dict[str, list]) -> bool:
+        published = False
+        for stream_name, labels in subscriptions.items():
+            if stream_name not in message:
                 continue
 
-            for stream_name, outlet in outlets.items():
-                if stream_name not in message:
-                    continue
+            values = convert_stream_sample(
+                stream_name,
+                message[stream_name],
+                labels,
+                STREAM_SPECS[stream_name].channel_format,
+            )
+            sample_timestamp = message.get("time")
+            outlet = self.outlets[stream_name]
+            if sample_timestamp is None:
+                outlet.push_sample(values)
+            else:
+                outlet.push_sample(values, timestamp=sample_timestamp + self.cortex_to_lsl_offset)
+            published = True
+            if self.config.print_samples:
+                print(f"{stream_name}: {values}", file=sys.stderr, flush=True)
+        return published
 
-                values = convert_stream_sample(
-                    stream_name,
-                    message[stream_name],
-                    subscriptions[stream_name],
-                    STREAM_SPECS[stream_name].channel_format,
-                )
-                sample_timestamp = message.get("time")
-                lsl_timestamp = sample_timestamp + cortex_to_lsl_offset if sample_timestamp is not None else None
-                if lsl_timestamp is None:
-                    outlet.push_sample(values)
-                else:
-                    outlet.push_sample(values, timestamp=lsl_timestamp)
-                if config.print_samples:
-                    print(f"{stream_name}: {values}", file=sys.stderr, flush=True)
 
+def run_bridge(config: BridgeConfig) -> None:
+    try:
+        CortexBridge(config).run()
     except KeyboardInterrupt:
         pass
-    finally:
-        if session_id and token:
-            close_session(client, token, session_id)
-        client.close()
 
 
 def bridge() -> None:
