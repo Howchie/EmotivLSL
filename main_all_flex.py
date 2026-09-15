@@ -61,9 +61,9 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_DC_RESTORE_HZ,
         metavar="HZ",
         help=(
-            "high-pass corner of the ADC accumulator's DC restore "
-            f"(default: {DEFAULT_DC_RESTORE_HZ}, the Flex passband corner; "
-            "0 disables it and restores the unbounded pure accumulator)"
+            "high-pass corner of an optional leak on the ADC accumulator "
+            f"(default: {DEFAULT_DC_RESTORE_HZ}, a pure accumulator; the analogue "
+            "chain already high-passes at 0.16 Hz, so a leak adds a second high-pass)"
         ),
     )
     parser.add_argument(

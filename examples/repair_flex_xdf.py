@@ -5,7 +5,7 @@ contain accumulated ADC values built from mis-signed deltas.  The damage is
 mostly reversible: the reader's transform (accumulate 7-bit deltas, clamp to
 14 bits, scale by 0.51 uV) is invertible almost everywhere, so the original
 wire values can be recovered from the stored signal, re-decoded with the
-correct rule, and re-accumulated with the DC restore.
+correct rule (offset binary, 63 = zero), and re-accumulated.
 
 Two things cannot be recovered and are marked ``BAD_unrecoverable``:
 
@@ -35,7 +35,8 @@ ADC_MAX = (1 << ADC_BITS) - 1
 ADC_MIDPOINT = 1 << (ADC_BITS - 1)
 SAMPLE_RATE = 128.0
 EEG_STREAM_NAME = "Epoc Flex 1.0"
-DEFAULT_DC_RESTORE_HZ = 0.16
+DEFAULT_DC_RESTORE_HZ = 0.0
+DELTA_ZERO = 63
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,8 +47,8 @@ def parse_args() -> argparse.Namespace:
                         help="output FIF (default: alongside the input, *_repaired_raw.fif)")
     parser.add_argument("--dc-restore-hz", type=float, default=DEFAULT_DC_RESTORE_HZ,
                         metavar="HZ",
-                        help=f"accumulator high-pass corner (default {DEFAULT_DC_RESTORE_HZ}; "
-                             "0 reproduces the unbounded pure accumulator)")
+                        help=f"accumulator leak corner (default {DEFAULT_DC_RESTORE_HZ}, a pure "
+                             "accumulator like the live reader)")
     parser.add_argument("--stream", default=EEG_STREAM_NAME,
                         help=f"EEG stream name (default {EEG_STREAM_NAME!r})")
     return parser.parse_args()
@@ -102,7 +103,7 @@ def repair(adc: np.ndarray, leak: float) -> tuple[np.ndarray, np.ndarray]:
 
     # Invert the old sign rule, then apply the correct one.
     raw = np.mod(deltas, 128)                 # the unsigned 7-bit wire value
-    corrected = (raw - 64).astype(np.float64)
+    corrected = (raw - DELTA_ZERO).astype(np.float64)
     corrected[reset_rows, :] = 0.0
     corrected[clamped] = 0.0
 

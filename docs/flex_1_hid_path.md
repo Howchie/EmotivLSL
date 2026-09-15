@@ -63,8 +63,8 @@ bytes 30..31 packet/status metadata
 
 Cortex calls its common bit unpacker with `bits=7`, `count=32`, and a 28-byte
 input at offset 2. The unpacked values are unsigned on the wire and are
-**offset binary**: 64 encodes a zero delta, so the signed delta is `raw - 64`,
-spanning -64 through +63. This exactly matches the Flex 1.0 specification's
+**offset binary**: 63 encodes a zero delta, so the signed delta is `raw - 63`,
+spanning -63 through +64. The +64 end matches the Flex 1.0 specification's
 maximum slew of 32.64 µV/sample at 0.51 µV/LSB (`32.64 / 0.51 = 64`).
 
 This was originally implemented as a two's-complement conversion, which is
@@ -84,27 +84,48 @@ and recovers the analogue chain's ~43 Hz roll-off (power above 45 Hz falls from
 state at the 14-bit midpoint (8192); the absolute DC offset is arbitrary for
 this AC-coupled device. `--remove-dc` emits midpoint-subtracted values.
 
-### DC restore
+### The zero is 63, not 64
+
+The reader first took 64 as the zero. The two Flex oddball recordings of
+2026-09-15 (15 and 18 min) show why that is one count off:
+
+* Decoded as `raw - 64`, the deltas average −1.00 counts/sample. Every channel
+  lies between −0.95 and −1.12, and the bias is steady across 10 s windows.
+* The analogue chain is AC-coupled, so the true mean delta is zero. Taken
+  literally, the bias is a 65 µV/s ramp: about 70 mV per recording, far beyond
+  the 14-bit range.
+* The 0.16 Hz leak the reader applied then turns the bias into a fixed offset
+  of −1 / (1 − leak) counts, or −65 µV. The published signals sit at
+  −61 to −63 µV.
+* Decoded as `raw - 63`, a pure integral of the longest loss-free stretches
+  (70–140 s) has no net drift: median −0.2 to +1.6 µV/s.
+
+Recordings made before the fix have no `delta_zero` entry in the stream's
+`cap` metadata. Their received deltas are exactly recoverable by undoing the
+leak, so they can be re-decoded offline.
+
+### No DC restore by default
 
 The protocol never transmits an absolute level, so the accumulator has no
-anchor: packet loss, electrode drift and floating wires all leave a permanent
-offset, and a pure integrator has no mechanism to shed any of them. On the
-pilot recording a pure integrator leaves 96.6% of samples outside the valid
-14-bit range.
+anchor. The reader used to reconstruct it with a leak,
+`state = state * exp(-2*pi*fc/128) + delta`, with `fc` = 0.16 Hz, and clamp it
+to the 14-bit range. Both were there because a pure integrator ran away: on the
+pilot recording it left 96.6% of samples outside the 14-bit range. That runaway
+was the off-by-one zero above, not a property of the device. At one count per
+sample, a pure integral starting at the midpoint leaves the 14-bit range after
+64 s. For the 28.8 min pilot that predicts 96.3% of samples out of range.
 
-The state is therefore reconstructed with a leak rather than a pure integral:
-
-```text
-state = state * exp(-2*pi*fc/128) + delta
-```
-
-`fc` defaults to 0.16 Hz (`--dc-restore-hz`, 0 disables it), which is the
-Flex 1.0 passband's documented high-pass corner; the matching 43 Hz roll-off is
-already present in the analogue chain and is visible in the decoded data. With
-the leak in place the accumulator stays bounded (99th percentile 814 counts,
-about 415 µV) and cannot reach the rail, where clamping would otherwise discard
-deltas asymmetrically and corrupt the channel. The cost is content below
-~0.16 Hz, which this device never transmitted in the first place.
+With the zero corrected, the leak is off by default (`--dc-restore-hz 0`).
+0.16 Hz is the Flex 1.0 passband's documented high-pass corner, but that corner
+is already in the analogue chain: the pure integral's spectrum rises as 1/f²
+down to ~0.3 Hz and flattens below ~0.2 Hz. A leak at the same corner would add
+a second high-pass on top, which distorts slow components such as the P3. The
+state is no longer clamped either. It is an integral from an arbitrary start,
+not an ADC reading, and the offsets left by lost reports make it wander. In the
+oddball recordings it wandered 2–6 mV peak-to-peak over a session. Consumers
+that display or threshold the raw stream must high-pass it themselves.
+`--dc-restore-hz` still enables the leak for anyone who wants a bounded
+signal.
 
 Flex 1.0 has 32 configurable sensor wires plus CMS/DRL references. The packet
 order is fixed as `LA..LQ`, then `RA..RQ`; CMS and DRL are references and are not
@@ -148,16 +169,12 @@ delta per channel, whereas restarting every channel at the midpoint creates a
 large artificial step. The old midpoint-reset behavior remains available with
 `--reset-on-gap` for compatibility, but should normally be left disabled.
 
-The offset a gap leaves behind is not permanent: the DC restore above decays it
-with the same 0.16 Hz time constant, so loss no longer accumulates without
-bound. Note that the midpoint reset was incidentally acting as a crude DC
-restore, which is why disabling it without the leak in place let the
-accumulator run away.
-
 ### Packet-gap discontinuities and analysis
 
-The missing delta cannot be recovered, so the sample after a gap may carry a
-small persistent offset. This is an acquisition discontinuity, not a change in
+The missing deltas cannot be recovered, so everything after a gap carries a
+persistent offset equal to the signal's change across the gap. With no leak it
+is a constant step; an analysis high-pass turns it into a decaying tail. This
+is an acquisition discontinuity, not a change in
 the CMS/DRL hardware reference, and `--remove-dc` does not detect or repair it.
 Do not treat the affected samples as a genuine EEG transient. For analysis, use
 the diagnostics stream to mark the gap and reject a short window around it; only
@@ -169,6 +186,23 @@ EEG sample with the same timestamp. The same events are summarized on stderr - t
 one immediately, then at most once every ten seconds - so packet loss is visible
 in the console without an LSL consumer attached.
 
+Estimating the change across a gap does not beat holding the level. This was
+tested on the oddball recordings by deleting blocks of deltas from loss-free
+stretches and measuring the offset each method leaves behind. RMS, µV, 29
+channels:
+
+| gap (samples)                                   | 1   | 8     | 16    |
+|-------------------------------------------------|-----|-------|-------|
+| hold (the reader)                               | 7.9 | 17.7  | 26.6  |
+| pre-gap linear trend, 16 samples                | 8.1 | 20.9  | 33.9  |
+| joint quadratic, 16 samples each side           | 11.6| 20.5  | 31.0  |
+| minimum-curvature bridge, second differences    | 7.3 | 49.3  | 93.1  |
+| best linear estimate (kriging, both sides)      | 1.1 | 15.8  | 24.4  |
+
+Almost every real loss is 8 samples, and 62.5 ms of EEG is too long to
+extrapolate. Even the best linear estimate gains only ~10% there. Only
+1-sample losses, which are rare, would benefit.
+
 ### Repeated reports
 
 The Flex dongle sometimes delivers the previous report a second time. There
@@ -179,8 +213,8 @@ all 32 channel deltas matched the report before it.
 
 The reader drops a report that is byte-identical to the previous one. Publishing
 it would add a fake sample and, because the payload is deltas, apply the same
-delta to every channel a second time. The next sample would be offset by up to
-one full slew step (32.64 µV), fading over about a second. In the `flex2.pcap`
+delta to every channel a second time. Every later sample would be offset by up
+to one full slew step (32.64 µV). In the `flex2.pcap`
 replay, dropping the two repeats changes the next sample by up to 33 µV. A dropped
 repeat counts as one discontinuity with nothing missing. Its `GAP_FLAG` is set
 on the next published sample, and `--reset-on-gap` ignores it.
@@ -245,8 +279,8 @@ The old arrival timestamps were off by a median of 31 ms.
 publishes a stand-in sample for every lost report and flags it with
 `FILLED = 1`. Sample number then matches headset time, so tools that ignore
 timestamps and assume a fixed rate stay aligned. A lost report's delta is
-unknown, so a filled sample applies a zero delta: every channel holds its level
-and decays with the DC restore. The report after the loss carries `GAP_FLAG`
+unknown, so a filled sample applies a zero delta: every channel holds its level.
+The report after the loss carries `GAP_FLAG`
 and `MISSING_REPORTS`, then applies its own delta. Losses longer than 60 s
 (`FILL_LIMIT_SECONDS`) are not filled.
 
@@ -265,8 +299,6 @@ pyxdf (1.17+) then keeps their timestamps rather than refitting them over sample
 number. Other loaders that do not honour the flag still see evenly
 spaced, gap-free samples, because lost samples are filled. The EPOC X streams
 declare the same flag.
-
-### Replay check
 
 ### Replay check
 

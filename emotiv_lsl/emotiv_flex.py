@@ -11,10 +11,9 @@ allows the user to map those wires to arbitrary 10-20 positions, so callers
 can replace the LSL labels while retaining the wire name in channel metadata.
 Packet-counter discontinuities are reported on a companion LSL stream; the ADC
 accumulator is carried across a gap by default so loss does not create a
-midpoint step in every channel.  Because the protocol sends no absolute level,
-the accumulator is reconstructed with a leak rather than a pure integrator so
-that packet loss, electrode drift and floating wires all decay instead of
-accumulating without bound.
+midpoint step in every channel.  The accumulator is a pure, unclamped integral:
+the protocol sends no absolute level, so each lost report leaves a constant
+offset, but correctly decoded deltas do not drift.
 """
 
 from __future__ import annotations
@@ -42,11 +41,12 @@ from emotiv_lsl.emotiv_base import (
 
 
 # Flex 1.0 transmits deltas only: it never sends an absolute level, so the
-# accumulator has no anchor and any error - a lost report, electrode drift, a
-# floating wire - is permanent.  Reconstructing with a leak instead of a pure
-# integrator bounds all of them and reproduces the device's documented
-# 0.16-43 Hz passband (the 43 Hz roll-off is already in the analogue chain).
-DEFAULT_DC_RESTORE_HZ = 0.16
+# accumulator has no anchor and a lost report leaves a permanent offset.  The
+# documented 0.16 Hz high-pass is already in the analogue chain, so correctly
+# decoded loss-free data does not drift and needs no leak; one here would add a
+# second high-pass on top of the hardware's.  The option remains for callers
+# that want a bounded signal.
+DEFAULT_DC_RESTORE_HZ = 0.0
 
 
 @dataclass(frozen=True)
@@ -66,8 +66,9 @@ class EmotivFlex(EmotivBase):
     SAMPLE_RATE = 128
     LSB_UV = 0.51
     ADC_BITS = 14
-    ADC_MAX = (1 << ADC_BITS) - 1
     ADC_MIDPOINT = 1 << (ADC_BITS - 1)
+    # The seven-bit wire value that encodes a zero delta.
+    DELTA_ZERO = 63
     EEG_USAGE = 2
     EEG_PRODUCT_MARKER = "eeg signals"
     PACKET_COUNTER_MODULUS = 1 << 7
@@ -225,12 +226,13 @@ class EmotivFlex(EmotivBase):
         Bytes 0 and 1 are packet metadata.  Bytes 2..29 contain 224 bits,
         exactly 32 values of seven bits each, in MSB-first order.
 
-        The wire values are *offset binary*: 64 encodes a zero delta, so the
-        signed value is ``raw - 64`` and the range is -64..63.  This is not
+        The wire values are *offset binary*: 63 encodes a zero delta, so the
+        signed value is ``raw - 63`` and the range is -63..64.  This is not
         two's complement.  Reading them as two's complement maps the most
-        common values (a small delta, i.e. raw near 64) onto the extremes
-        +-64, which injects a large artificial slew on every sample and makes
-        the accumulator run away; see docs/flex_1_hid_path.md.
+        common values (a small delta, i.e. raw near 63) onto the extremes,
+        which injects a large artificial slew on every sample and makes the
+        accumulator run away.  Taking 64 as zero reads every delta one count
+        low, a 65 uV/s ramp in every channel; see docs/flex_1_hid_path.md.
         """
 
         if len(packet) != EmotivFlex.READ_SIZE:
@@ -244,7 +246,7 @@ class EmotivFlex(EmotivBase):
                 value = (value << 1) | (
                     (payload[bit_position // 8] >> (7 - bit_position % 8)) & 1
                 )
-            values.append(value - 64)
+            values.append(value - EmotivFlex.DELTA_ZERO)
         return values
 
     def configure_cipher(self, device: dict) -> None:
@@ -277,10 +279,10 @@ class EmotivFlex(EmotivBase):
         """Decode one received report, plus a filled sample per lost report before it.
 
         A lost report's delta is unknown, so each filled sample applies a zero
-        delta: the accumulator holds its level and decays with the DC restore,
-        exactly as if the report had carried no change.  The report after the
-        loss then applies its own delta.  Losses longer than
-        ``FILL_LIMIT_SECONDS`` are decayed the same way but not filled.
+        delta: the accumulator holds its level (decaying with the DC restore,
+        if one is enabled), exactly as if the report had carried no change.
+        The report after the loss then applies its own delta.  Losses longer
+        than ``FILL_LIMIT_SECONDS`` are handled the same way but not filled.
         """
         counter = plaintext[0] & 0x7F
         previous_counter = self._last_counter
@@ -312,11 +314,12 @@ class EmotivFlex(EmotivBase):
             # nothing, so it never resets.
             self._adc = [float(self.ADC_MIDPOINT)] * len(self.CH_NAMES)
 
+        # No clamp: the state is an integral from an arbitrary start, not an
+        # ADC reading, so the 14-bit range does not bound it.  Offsets left by
+        # lost reports let it wander by millivolts over a session.
         for index, delta in enumerate(self.unpack_signed_deltas(plaintext)):
             centered = (self._adc[index] - self.ADC_MIDPOINT) * self._leak + delta
-            self._adc[index] = max(
-                0.0, min(float(self.ADC_MAX), self.ADC_MIDPOINT + centered)
-            )
+            self._adc[index] = self.ADC_MIDPOINT + centered
 
         return DecodedReport(fills, fill_diagnostics, self._output(), diagnostics)
 
@@ -362,6 +365,8 @@ class EmotivFlex(EmotivBase):
         cap.append_child_value("labelscheme", "user-configurable 10-20")
         cap.append_child_value("montage", self.montage_name)
         cap.append_child_value("dc_restore_hz", str(self.dc_restore_hz))
+        # Recordings without this field were decoded with 64 as the zero.
+        cap.append_child_value("delta_zero", str(self.DELTA_ZERO))
         for reference, location in sorted(self.references.items()):
             cap.append_child_value(reference.lower(), location)
         info.desc().append_child_value(
