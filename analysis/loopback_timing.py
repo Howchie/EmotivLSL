@@ -25,11 +25,11 @@ import pyxdf
 from scipy.signal import butter, sosfiltfilt
 
 import drt_timing as dt
-import epocx_sanity as ex
+import emotiv as em
 
 SEED = 7
 FS = 128.0
-LABELS = ex.LABELS
+LABELS = list(em.EPOCX.labels)
 
 
 def _stats(values: np.ndarray) -> dict:
@@ -54,7 +54,7 @@ def load_xdf(path: str) -> dict:
     streams, _ = pyxdf.load_xdf(path, synchronize_clocks=True, dejitter_timestamps=False)
     by_name = lambda name: [s for s in streams if s["info"]["name"][0] == name]
     eeg = by_name("Epoc X")[0]
-    grid = ex.epocx_grid(eeg, by_name("Epoc X Packet Diagnostics")[0])
+    grid = em.epocx_grid(eeg, by_name("Epoc X Packet Diagnostics")[0])
     rows = sorted(
         (float(ts), str(value[0]))
         for stream in by_name("PsychoPy Markers")
@@ -346,7 +346,7 @@ def main() -> None:
     marker, _ = analyze_marker("data/DRT_Timing/marker-timing.xdf", drt["eeg_chain_latency_ms"]["mean_of_corrected_edges"], args.bootstrap, rng)
     result = {
         "method": {
-            "timestamp_reconstruction": "EPOC X arrival times fitted to packet counter (analysis/epocx_sanity.py)",
+            "timestamp_reconstruction": "EPOC X arrival times fitted to packet counter (analysis/emotiv/loading.py)",
             "latency_feature": "pooled 0.25-ms kernel template of the common electrical transient; T8 excluded for LED latency",
             "jitter_feature": "leave-one-trial-out template alignment",
             "filtering_note": "symmetric pre/post ringing is reported as a filter signature, not subtracted from the total delay",

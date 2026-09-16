@@ -1,0 +1,928 @@
+{
+  "recording": "data/GnG/gng_flex.xdf",
+  "device": "flex",
+  "primary_roi": "central",
+  "p3_window_s": [
+    0.3,
+    0.5
+  ],
+  "integrity": {
+    "device": "flex",
+    "samples": 119352,
+    "duration_s": 932.5332984458946,
+    "filled_samples": 71,
+    "filled_pct": 0.05948790133386956,
+    "filled_runs": 10,
+    "filled_run_lengths": {
+      "7": 9,
+      "8": 1
+    },
+    "longest_fill_s": 0.0625,
+    "dropped_repeats": 67,
+    "counter_resets": 0,
+    "counter_steps_not_one": 0,
+    "decoder_max_fraction": 0.007352941174758598,
+    "decoder_delta_range": [
+      -63,
+      64
+    ],
+    "slew_saturated_pct": 0.7111680499664654,
+    "fill8_step_rms_uv_median_channel": 17.3067875716236,
+    "slew_saturated_pct_by_channel": {
+      "C3": 0.42253521126760557,
+      "T7": 0.34121395036887997,
+      "FC1": 0.39570757880617036,
+      "FC5": 0.39403085177733066,
+      "FT9": 0.34624413145539906,
+      "F3": 0.4736753856472166,
+      "F7": 0.482897384305835,
+      "Fp1": 1.5425888665325285,
+      "Pz": 0.613682092555332,
+      "Cz": 0.4535546613011402,
+      "O1": 2.0129107981220655,
+      "PO9": 1.0848423876592892,
+      "P3": 0.4753521126760563,
+      "P7": 0.4954728370221328,
+      "CP1": 0.534037558685446,
+      "CP5": 0.41918175720992623,
+      "C4": 0.5549966465459424,
+      "T8": 0.8735747820254862,
+      "FC2": 0.37139503688799463,
+      "FC6": 0.5918846411804158,
+      "FT10": 0.6027833668678739,
+      "F4": 0.562541918175721,
+      "F8": 0.7042253521126761,
+      "Fp2": 1.4017437961099932,
+      "Oz": 1.2692823608316566,
+      "Fz": 0.4678068410462776,
+      "O2": 1.063044936284373,
+      "PO10": 0.8601609657947685,
+      "P4": 0.6212273641851107,
+      "P8": 0.9347753185781355,
+      "CP2": 0.6790744466800805,
+      "CP6": 0.7109322602280348
+    },
+    "timestamp_segments": [
+      {
+        "start_s": 0.0,
+        "end_s": 932.5332984458946,
+        "rate_hz": 127.98573777829586
+      }
+    ]
+  },
+  "preprocessing": {
+    "bad_channels": [
+      "O1"
+    ],
+    "good_channels": [
+      "C3",
+      "T7",
+      "FC1",
+      "FC5",
+      "FT9",
+      "F3",
+      "F7",
+      "Fp1",
+      "Pz",
+      "Cz",
+      "PO9",
+      "P3",
+      "P7",
+      "CP1",
+      "CP5",
+      "C4",
+      "T8",
+      "FC2",
+      "FC6",
+      "FT10",
+      "F4",
+      "F8",
+      "Fp2",
+      "Oz",
+      "Fz",
+      "O2",
+      "PO10",
+      "P4",
+      "P8",
+      "CP2",
+      "CP6"
+    ],
+    "ica_excluded": [
+      2,
+      7
+    ],
+    "rail_pct_by_channel": {
+      "C3": 0.42,
+      "T7": 0.34,
+      "FC1": 0.4,
+      "FC5": 0.39,
+      "FT9": 0.35,
+      "F3": 0.47,
+      "F7": 0.48,
+      "Fp1": 1.54,
+      "Pz": 0.61,
+      "Cz": 0.45,
+      "O1": 2.01,
+      "PO9": 1.08,
+      "P3": 0.48,
+      "P7": 0.5,
+      "CP1": 0.53,
+      "CP5": 0.42,
+      "C4": 0.55,
+      "T8": 0.87,
+      "FC2": 0.37,
+      "FC6": 0.59,
+      "FT10": 0.6,
+      "F4": 0.56,
+      "F8": 0.7,
+      "Fp2": 1.4,
+      "Oz": 1.27,
+      "Fz": 0.47,
+      "O2": 1.06,
+      "PO10": 0.86,
+      "P4": 0.62,
+      "P8": 0.93,
+      "CP2": 0.68,
+      "CP6": 0.71
+    },
+    "ica_corr_max": {
+      "VEOG": 0.8026458919466696,
+      "HEOG": 0.7030156401775727
+    },
+    "ica_corr_excluded": {
+      "VEOG": [
+        -0.8026458919466696,
+        -0.07623783019706293
+      ],
+      "HEOG": [
+        0.014963145584913844,
+        0.7030156401775727
+      ]
+    },
+    "pops_per_min": {
+      "C3": 0.1039171909884311,
+      "T7": 0.5195859549421554,
+      "FC1": 0.1039171909884311,
+      "FC5": 0.1039171909884311,
+      "FT9": 0.4156687639537244,
+      "F3": 0.2078343819768622,
+      "F7": 0.1039171909884311,
+      "Fp1": 0.1039171909884311,
+      "Pz": 0.2078343819768622,
+      "Cz": 0.0,
+      "O1": 0.9352547188958799,
+      "PO9": 1.5587578648264664,
+      "P3": 0.4156687639537244,
+      "P7": 0.5195859549421554,
+      "CP1": 0.31175157296529327,
+      "CP5": 0.5195859549421554,
+      "C4": 0.0,
+      "T8": 0.8313375279074487,
+      "FC2": 0.1039171909884311,
+      "FC6": 0.0,
+      "FT10": 1.0391719098843109,
+      "F4": 0.0,
+      "F8": 0.0,
+      "Fp2": 0.0,
+      "Oz": 1.4548406738380353,
+      "Fz": 0.0,
+      "O2": 0.6235031459305865,
+      "PO10": 1.247006291861173,
+      "P4": 0.8313375279074487,
+      "P8": 0.7274203369190176,
+      "CP2": 0.4156687639537244,
+      "CP6": 0.1039171909884311
+    },
+    "pct_task_gross": 15.970056144728634,
+    "pct_task_residual": 16.566664776271764,
+    "task_minutes": 11.479817708333334,
+    "residual_share_by_channel": {
+      "C3": 0.01818181818181818,
+      "T7": 0.025454545454545455,
+      "FC1": 0.01818181818181818,
+      "FC5": 0.01890909090909091,
+      "FT9": 0.03127272727272727,
+      "F3": 0.02327272727272727,
+      "F7": 0.02909090909090909,
+      "Fp1": 0.027636363636363636,
+      "Pz": 0.024,
+      "Cz": 0.016,
+      "O1": 0.03781818181818182,
+      "PO9": 0.0669090909090909,
+      "P3": 0.024,
+      "P7": 0.02327272727272727,
+      "CP1": 0.02181818181818182,
+      "CP5": 0.017454545454545455,
+      "C4": 0.013818181818181818,
+      "T8": 0.032,
+      "FC2": 0.011636363636363636,
+      "FC6": 0.017454545454545455,
+      "FT10": 0.04363636363636364,
+      "F4": 0.020363636363636365,
+      "F8": 0.02181818181818182,
+      "Fp2": 0.02109090909090909,
+      "Oz": 0.04654545454545454,
+      "Fz": 0.017454545454545455,
+      "O2": 0.02909090909090909,
+      "PO10": 0.06327272727272727,
+      "P4": 0.028363636363636365,
+      "P8": 0.024,
+      "CP2": 0.01890909090909091,
+      "CP6": 0.01890909090909091
+    },
+    "parameters": {
+      "device": "flex",
+      "profile_source": "re-derived on data/GnG/gng_flex.xdf (2026-09-16): reference checked against a P3, thresholds from post-ICA task-time 1-s p2p percentiles",
+      "profile_validated": true,
+      "ica_band": [
+        1.0,
+        30.0
+      ],
+      "erp_band": [
+        0.1,
+        30.0
+      ],
+      "gross_uv": 300.0,
+      "residual_uv": 120.0,
+      "win_s": 1.0,
+      "step_s": 0.5,
+      "fill_pad": [
+        0.25,
+        0.5
+      ],
+      "eog_r": 0.5,
+      "channel_bad_share": 0.1,
+      "pop_uv": 60.0,
+      "rail_pct": 10.0,
+      "manual_bads": {},
+      "reference": "average",
+      "reference_why": "Measured on the oddball runs: the average reference roughly tripled SNR against the recorded TP9 reference, the opposite of the EPOC X.  The cap covers the head with midline sites, so averaging does not sit on top of the component of interest.  Re-checked on a P3, the component an average reference is most likely to erase: on gng_flex.xdf the Go-NoGo difference over the central ROI is +0.58 uV [-0.60, +1.72] in the average reference against +0.14 uV [-2.91, +3.02] in the recorded one -- the recorded reference has the larger peak but a 2.5x wider interval, and every ROI peaks on the same sample there, which is the signature of a common-mode component rather than a topography.",
+      "bad_channel_handling": "interpolate",
+      "eog_proxies_used": [
+        "HEOG",
+        "VEOG"
+      ],
+      "seed": 7
+    }
+  },
+  "timing": {
+    "chain_latency_s": 0.06975544868138632,
+    "shift_samples": 9,
+    "timing_source": "EPOC X DRT LED timing, applied to both headsets; the Flex's own 87-trial DRT run gave 64.8 ms [48.0, 67.5], which agrees to within one sample at 128 Hz",
+    "reference": "average",
+    "bad_channel_handling": "interpolate",
+    "bad_channels": [
+      "O1"
+    ],
+    "drops": {
+      "BAD_residual": 69,
+      "BAD_fill": 7
+    },
+    "n_epochs": 321,
+    "n_by_condition": {
+      "go": 62,
+      "nogo": 259
+    }
+  },
+  "behaviour": {
+    "go_trials": 80,
+    "nogo_trials": 320,
+    "hits": 77,
+    "false_alarms": 0,
+    "hit_rate": 0.9625,
+    "false_alarm_rate": 0.0,
+    "rt_reference": "from the tone marker; audio-output latency for this session is unmeasured",
+    "rt_median_s": 0.35472716855573455,
+    "rt_iqr_s": [
+      0.33289210450950935,
+      0.3894676436592225
+    ]
+  },
+  "rois": {
+    "central": {
+      "roi": [
+        "Cz",
+        "CP1",
+        "CP2",
+        "Pz"
+      ],
+      "n_go": 62,
+      "n_nogo": 259,
+      "go_minus_nogo_uv": 0.6187685180548197,
+      "ci95_uv": [
+        -0.5894709853130464,
+        1.7644845368914754
+      ],
+      "window_s": [
+        0.3,
+        0.5
+      ],
+      "peak_latency_s": 0.3359375,
+      "peak_latency_ci95_s": [
+        0.3046875,
+        0.3671875
+      ],
+      "peak_uv": 1.8470946070345586,
+      "baseline_rms_uv": 0.29322493738121214,
+      "plus_minus_rms_uv": 0.23443278757659566
+    },
+    "frontal": {
+      "roi": [
+        "Fz",
+        "FC1",
+        "FC2",
+        "F3",
+        "F4"
+      ],
+      "n_go": 62,
+      "n_nogo": 259,
+      "go_minus_nogo_uv": -0.45555385951473537,
+      "ci95_uv": [
+        -1.934005508043524,
+        0.9347926139058891
+      ],
+      "window_s": [
+        0.3,
+        0.5
+      ],
+      "peak_latency_s": 0.3046875,
+      "peak_latency_ci95_s": [
+        0.3046875,
+        0.5
+      ],
+      "peak_uv": 0.2706810059035766,
+      "baseline_rms_uv": 0.1740821198183017,
+      "plus_minus_rms_uv": 0.24345630546691258
+    },
+    "posterior": {
+      "roi": [
+        "O1",
+        "Oz",
+        "O2"
+      ],
+      "n_go": 62,
+      "n_nogo": 259,
+      "go_minus_nogo_uv": 0.9779717811631705,
+      "ci95_uv": [
+        -1.2157812993797255,
+        3.166973317326071
+      ],
+      "window_s": [
+        0.3,
+        0.5
+      ],
+      "peak_latency_s": 0.421875,
+      "peak_latency_ci95_s": [
+        0.359375,
+        0.4921875
+      ],
+      "peak_uv": 2.7711691875275712,
+      "baseline_rms_uv": 0.50901613522552,
+      "plus_minus_rms_uv": 0.5952300354867088
+    },
+    "inferior": {
+      "roi": [
+        "FT9",
+        "FT10",
+        "PO9",
+        "PO10"
+      ],
+      "n_go": 62,
+      "n_nogo": 259,
+      "go_minus_nogo_uv": 0.0052111379877970345,
+      "ci95_uv": [
+        -1.9613375141214926,
+        2.023494153990162
+      ],
+      "window_s": [
+        0.3,
+        0.5
+      ],
+      "peak_latency_s": 0.453125,
+      "peak_latency_ci95_s": [
+        0.390625,
+        0.5
+      ],
+      "peak_uv": 1.4022212454025262,
+      "baseline_rms_uv": 0.26049284088014657,
+      "plus_minus_rms_uv": 0.3276347610432508
+    }
+  },
+  "topography_at_primary_peak": {
+    "reference": "average",
+    "same_sign_test_meaningful": false,
+    "per_channel_uv": {
+      "C3": 1.7630162436613173,
+      "T7": -1.1587441202925457,
+      "FC1": 0.13026037152269454,
+      "FC5": -0.1878178719423012,
+      "FT9": -1.0352828243957508,
+      "F3": -0.19539114511793793,
+      "F7": -2.3417080767237253,
+      "Fp1": -1.949189136723113,
+      "Pz": 1.714021186727505,
+      "Cz": 1.3883673471219764,
+      "O1": -0.5145020964458628,
+      "PO9": -2.9388658978209663,
+      "P3": 2.0750906505042233,
+      "P7": -0.045798888558274686,
+      "CP1": 1.9870815126843555,
+      "CP5": 0.7733514333197633,
+      "C4": -0.016154880140410333,
+      "T8": 0.6609139987379054,
+      "FC2": 0.7180098249607021,
+      "FC6": -1.0947802739706523,
+      "FT10": -2.9958205236633737,
+      "F4": 0.6074166245654024,
+      "F8": -1.3680283448220738,
+      "Fp2": 0.6607122472696876,
+      "Oz": -0.2853870754454937,
+      "Fz": -0.4086881501248041,
+      "O2": 0.4122096326820573,
+      "PO10": -1.8567936311193245,
+      "P4": 0.9945246283584599,
+      "P8": 1.4057658768135979,
+      "CP2": 2.298908381604398,
+      "CP6": 0.28880088032669726
+    },
+    "channel_mean_uv": -0.016078190513933333,
+    "all_channels_same_sign": false
+  },
+  "clusters": [
+    {
+      "p": 0.001,
+      "sign": "positive",
+      "t_start": 0.578125,
+      "t_end": 1.0,
+      "channels": [
+        "CP6",
+        "O1",
+        "O2",
+        "Oz",
+        "P3",
+        "P4",
+        "P7",
+        "P8",
+        "T8"
+      ],
+      "mass": 360.3652292187297
+    },
+    {
+      "p": 0.0045,
+      "sign": "negative",
+      "t_start": 0.453125,
+      "t_end": 0.6484375,
+      "channels": [
+        "C3",
+        "CP1",
+        "CP5",
+        "FC5"
+      ],
+      "mass": 153.82691124577886
+    },
+    {
+      "p": 0.014,
+      "sign": "negative",
+      "t_start": 0.140625,
+      "t_end": 0.203125,
+      "channels": [
+        "C3",
+        "C4",
+        "CP1",
+        "CP6",
+        "Cz",
+        "FC2",
+        "FC6",
+        "Fz"
+      ],
+      "mass": 99.43275873830628
+    },
+    {
+      "p": 0.0435,
+      "sign": "positive",
+      "t_start": 0.15625,
+      "t_end": 0.1953125,
+      "channels": [
+        "FT9",
+        "O1",
+        "O2",
+        "P7",
+        "PO10",
+        "PO9"
+      ],
+      "mass": 59.36526629166794
+    },
+    {
+      "p": 0.055,
+      "sign": "positive",
+      "t_start": 0.2890625,
+      "t_end": 0.359375,
+      "channels": [
+        "C3",
+        "CP1",
+        "P3"
+      ],
+      "mass": 53.623364177409925
+    },
+    {
+      "p": 0.1625,
+      "sign": "positive",
+      "t_start": 0.8828125,
+      "t_end": 0.9140625,
+      "channels": [
+        "O1",
+        "P3",
+        "P7"
+      ],
+      "mass": 29.998185319581566
+    },
+    {
+      "p": 0.1805,
+      "sign": "positive",
+      "t_start": 0.4375,
+      "t_end": 0.4921875,
+      "channels": [
+        "P8"
+      ],
+      "mass": 27.61079707200997
+    },
+    {
+      "p": 0.1845,
+      "sign": "negative",
+      "t_start": 0.796875,
+      "t_end": 0.859375,
+      "channels": [
+        "C3"
+      ],
+      "mass": 27.342405030121185
+    },
+    {
+      "p": 0.2055,
+      "sign": "positive",
+      "t_start": 0.296875,
+      "t_end": 0.3515625,
+      "channels": [
+        "CP2"
+      ],
+      "mass": 25.257652136366783
+    },
+    {
+      "p": 0.2595,
+      "sign": "positive",
+      "t_start": 0.7578125,
+      "t_end": 0.7890625,
+      "channels": [
+        "P3",
+        "P7"
+      ],
+      "mass": 20.652820916510862
+    },
+    {
+      "p": 0.3695,
+      "sign": "positive",
+      "t_start": 0.1328125,
+      "t_end": 0.1484375,
+      "channels": [
+        "O2",
+        "Oz"
+      ],
+      "mass": 15.46298910273719
+    },
+    {
+      "p": 0.448,
+      "sign": "positive",
+      "t_start": 0.625,
+      "t_end": 0.6484375,
+      "channels": [
+        "O2"
+      ],
+      "mass": 12.900890174574638
+    },
+    {
+      "p": 0.4835,
+      "sign": "positive",
+      "t_start": 0.2421875,
+      "t_end": 0.2578125,
+      "channels": [
+        "F4",
+        "Fp2"
+      ],
+      "mass": 11.894022937160857
+    },
+    {
+      "p": 0.523,
+      "sign": "negative",
+      "t_start": 0.9765625,
+      "t_end": 1.0,
+      "channels": [
+        "C3"
+      ],
+      "mass": 11.185360175133159
+    },
+    {
+      "p": 0.579,
+      "sign": "positive",
+      "t_start": 0.3984375,
+      "t_end": 0.4140625,
+      "channels": [
+        "P8"
+      ],
+      "mass": 9.420175447176288
+    },
+    {
+      "p": 0.6045,
+      "sign": "negative",
+      "t_start": 0.890625,
+      "t_end": 0.90625,
+      "channels": [
+        "F8"
+      ],
+      "mass": 8.884977511152073
+    },
+    {
+      "p": 0.62,
+      "sign": "negative",
+      "t_start": 0.703125,
+      "t_end": 0.71875,
+      "channels": [
+        "C3"
+      ],
+      "mass": 8.762706431142576
+    },
+    {
+      "p": 0.6735,
+      "sign": "negative",
+      "t_start": 0.2578125,
+      "t_end": 0.2734375,
+      "channels": [
+        "PO10"
+      ],
+      "mass": 8.371707293704478
+    },
+    {
+      "p": 0.7035,
+      "sign": "negative",
+      "t_start": 0.0625,
+      "t_end": 0.0703125,
+      "channels": [
+        "Fp1"
+      ],
+      "mass": 7.205906873520025
+    },
+    {
+      "p": 0.7035,
+      "sign": "negative",
+      "t_start": 0.1171875,
+      "t_end": 0.125,
+      "channels": [
+        "CP6"
+      ],
+      "mass": 7.320484549179039
+    },
+    {
+      "p": 0.7475,
+      "sign": "negative",
+      "t_start": 0.0625,
+      "t_end": 0.0703125,
+      "channels": [
+        "FC5"
+      ],
+      "mass": 6.111018954892488
+    },
+    {
+      "p": 0.7685,
+      "sign": "positive",
+      "t_start": 0.03125,
+      "t_end": 0.0390625,
+      "channels": [
+        "P8"
+      ],
+      "mass": 5.959945927154575
+    },
+    {
+      "p": 0.771,
+      "sign": "negative",
+      "t_start": 0.2890625,
+      "t_end": 0.296875,
+      "channels": [
+        "PO10"
+      ],
+      "mass": 5.919169049374398
+    },
+    {
+      "p": 0.7815,
+      "sign": "negative",
+      "t_start": 0.9375,
+      "t_end": 0.9453125,
+      "channels": [
+        "C3"
+      ],
+      "mass": 5.851685244242055
+    },
+    {
+      "p": 0.7895,
+      "sign": "positive",
+      "t_start": 0.7109375,
+      "t_end": 0.71875,
+      "channels": [
+        "O2"
+      ],
+      "mass": 5.811522266626376
+    },
+    {
+      "p": 0.8185,
+      "sign": "positive",
+      "t_start": 0.84375,
+      "t_end": 0.8515625,
+      "channels": [
+        "P7"
+      ],
+      "mass": 5.682384089846405
+    },
+    {
+      "p": 0.837,
+      "sign": "positive",
+      "t_start": 0.078125,
+      "t_end": 0.0859375,
+      "channels": [
+        "PO10"
+      ],
+      "mass": 5.600526210231242
+    },
+    {
+      "p": 0.8475,
+      "sign": "positive",
+      "t_start": 0.421875,
+      "t_end": 0.4296875,
+      "channels": [
+        "P4"
+      ],
+      "mass": 5.565845800422521
+    },
+    {
+      "p": 0.859,
+      "sign": "negative",
+      "t_start": 0.5703125,
+      "t_end": 0.578125,
+      "channels": [
+        "CP2"
+      ],
+      "mass": 5.483646647086843
+    },
+    {
+      "p": 0.888,
+      "sign": "positive",
+      "t_start": 0.1171875,
+      "t_end": 0.125,
+      "channels": [
+        "FT9"
+      ],
+      "mass": 5.343487502075316
+    },
+    {
+      "p": 0.8895,
+      "sign": "negative",
+      "t_start": 0.2265625,
+      "t_end": 0.234375,
+      "channels": [
+        "CP1"
+      ],
+      "mass": 5.3281001575562215
+    },
+    {
+      "p": 0.89,
+      "sign": "negative",
+      "t_start": 0.734375,
+      "t_end": 0.7421875,
+      "channels": [
+        "C3"
+      ],
+      "mass": 5.324996423858378
+    },
+    {
+      "p": 0.8925,
+      "sign": "negative",
+      "t_start": 0.671875,
+      "t_end": 0.6796875,
+      "channels": [
+        "C3"
+      ],
+      "mass": 5.302348513948951
+    },
+    {
+      "p": 0.9035,
+      "sign": "positive",
+      "t_start": 0.375,
+      "t_end": 0.375,
+      "channels": [
+        "P8"
+      ],
+      "mass": 3.4475735677749237
+    },
+    {
+      "p": 0.9145,
+      "sign": "positive",
+      "t_start": 0.546875,
+      "t_end": 0.546875,
+      "channels": [
+        "P8"
+      ],
+      "mass": 3.0017215954930365
+    },
+    {
+      "p": 0.9365,
+      "sign": "negative",
+      "t_start": 0.3046875,
+      "t_end": 0.3046875,
+      "channels": [
+        "FT10"
+      ],
+      "mass": 2.8211756350815933
+    },
+    {
+      "p": 0.9375,
+      "sign": "negative",
+      "t_start": 0.1015625,
+      "t_end": 0.1015625,
+      "channels": [
+        "Fp1"
+      ],
+      "mass": 2.8194696502881627
+    },
+    {
+      "p": 0.968,
+      "sign": "positive",
+      "t_start": 0.2734375,
+      "t_end": 0.2734375,
+      "channels": [
+        "C3"
+      ],
+      "mass": 2.6727660704246494
+    },
+    {
+      "p": 0.983,
+      "sign": "negative",
+      "t_start": 0.875,
+      "t_end": 0.875,
+      "channels": [
+        "C3"
+      ],
+      "mass": 2.6160124489968517
+    },
+    {
+      "p": 0.9875,
+      "sign": "positive",
+      "t_start": 0.3671875,
+      "t_end": 0.3671875,
+      "channels": [
+        "CP2"
+      ],
+      "mass": 2.6079012325614603
+    },
+    {
+      "p": 0.9915,
+      "sign": "negative",
+      "t_start": 0.3828125,
+      "t_end": 0.3828125,
+      "channels": [
+        "FC5"
+      ],
+      "mass": 2.599631680607334
+    }
+  ],
+  "nogo_n1_p2": {
+    "n_trials": 259,
+    "n1_latency_s": 0.078125,
+    "n1_ci95": [
+      0.078125,
+      0.078125
+    ],
+    "p2_latency_s": 0.1640625,
+    "p2_ci95": [
+      0.15625,
+      0.171875
+    ],
+    "n1_amp_uv": -3.962295008365725,
+    "p2_amp_uv": 5.983369520258661
+  },
+  "blocks_primary": {
+    "block0": {
+      "n_go": 31,
+      "n_nogo": 137,
+      "go_minus_nogo_uv": 1.6149711890888272,
+      "ci95_uv": [
+        0.15266534885897126,
+        3.1107998103967
+      ]
+    },
+    "block1": {
+      "n_go": 31,
+      "n_nogo": 122,
+      "go_minus_nogo_uv": -0.38362697954046576,
+      "ci95_uv": [
+        -2.2067139428146847,
+        1.3637240020475416
+      ]
+    }
+  }
+}

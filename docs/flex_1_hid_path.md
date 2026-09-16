@@ -161,6 +161,23 @@ When using `main_all_flex.py`, the same montage is also supplied as the
 `mappings` object in Cortex's `controlDevice connect` request. The original
 Flex path requires that object when Cortex connects a discovered headset.
 
+### The display stream
+
+The accumulator has no anchor, so the published signal is an integral from an
+arbitrary start and drifts by millivolts over a session: a 50 uV EEG feature is
+under 1% of an autoscaled trace, which is why nothing appears to happen in a live
+viewer even when the data is good. The reader therefore publishes a second
+outlet, `Epoc Flex 1.0 Display`, carrying the same samples through a one-pole
+high pass at `--display-hz` (default 0.5 Hz, 0 to suppress the outlet). It is the
+leaky accumulator the reader used to apply to the archive, moved off the archive
+and onto a viewer-only copy, and costs one multiply-add per channel per sample.
+
+Record and analyse `Epoc Flex 1.0`. The display copy is a second high pass on top
+of the analogue chain's 0.16 Hz one; measured on the oddball runs, that costs the
+slow late components 10-20% of their amplitude and adds an undershoot after every
+large deflection. `analysis/emotiv/loading.py` refuses the display stream by name
+so a recording of the wrong outlet fails loudly rather than quietly.
+
 If a USB report is lost, the 7-bit deltas between the missing and next report
 cannot be reconstructed. The reader counts the counter discontinuity and
 publishes it on the `Epoc Flex 1.0 Packet Diagnostics` LSL stream. By default it

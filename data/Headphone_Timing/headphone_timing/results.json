@@ -1,0 +1,148 @@
+{
+  "xdf": "data/Headphone_Timing/data/headphone_wasapi_T7.xdf",
+  "channel": "P7",
+  "eeg_chain_source": "emotiv.devices.EPOCX.timing (DRT tactile test, data/DRT_Timing/loopback_timing/results.json (pre-firmware-fix; superseded once the DRT rerun lands))",
+  "recording": {
+    "samples": 23118,
+    "duration_s": 180.50859776401194,
+    "interpolated_samples": 0,
+    "fitted_rate_hz": [
+      128.06592199127522
+    ],
+    "arrival_residual_sd_ms": 1.6070128636503964,
+    "tones": 130
+  },
+  "pickup_ranking": [
+    {
+      "channel": "P7",
+      "baseline_uv": 31.893734497772048,
+      "burst_uv": 946.5017626931925,
+      "ratio": 29.676730480066887
+    },
+    {
+      "channel": "O1",
+      "baseline_uv": 2.8298381617878894,
+      "burst_uv": 79.5344819867218,
+      "ratio": 28.105664507850154
+    },
+    {
+      "channel": "FC6",
+      "baseline_uv": 10.9398507747024,
+      "burst_uv": 231.555361902554,
+      "ratio": 21.166226731173403
+    },
+    {
+      "channel": "F4",
+      "baseline_uv": 3.579959620308955,
+      "burst_uv": 64.38518458782247,
+      "ratio": 17.984891288317364
+    },
+    {
+      "channel": "AF3",
+      "baseline_uv": 9.35613646640035,
+      "burst_uv": 84.58367842612799,
+      "ratio": 9.040449413054622
+    },
+    {
+      "channel": "AF4",
+      "baseline_uv": 1.4142063926261956,
+      "burst_uv": 7.1544029260844795,
+      "ratio": 5.05895247213434
+    },
+    {
+      "channel": "T8",
+      "baseline_uv": 1.297114130216786,
+      "burst_uv": 4.037567673575625,
+      "ratio": 3.112731238924079
+    },
+    {
+      "channel": "T7",
+      "baseline_uv": 1.5979213370127752,
+      "burst_uv": 2.1469024303436073,
+      "ratio": 1.3435595236228097
+    },
+    {
+      "channel": "F3",
+      "baseline_uv": 1.751781293195157,
+      "burst_uv": 2.3331613593789435,
+      "ratio": 1.3318793667007254
+    },
+    {
+      "channel": "O2",
+      "baseline_uv": 1.499343603884684,
+      "burst_uv": 1.9463734601480573,
+      "ratio": 1.2981503740071012
+    },
+    {
+      "channel": "F8",
+      "baseline_uv": 1.3440751144609462,
+      "burst_uv": 1.6164952260181442,
+      "ratio": 1.202682207732456
+    },
+    {
+      "channel": "FC5",
+      "baseline_uv": 1.431775422970856,
+      "burst_uv": 1.6418555224799671,
+      "ratio": 1.1467269909363345
+    },
+    {
+      "channel": "P8",
+      "baseline_uv": 1.4165598653620581,
+      "burst_uv": 1.6197618669065643,
+      "ratio": 1.143447521360186
+    },
+    {
+      "channel": "F7",
+      "baseline_uv": 1.7199116149092852,
+      "burst_uv": 1.91419649984801,
+      "ratio": 1.1129621332018111
+    }
+  ],
+  "main": {
+    "trials": 130,
+    "trials_with_contact": 130,
+    "peak_pickup_uv_median": 1451.1174794183257,
+    "onset_burst_after_marker_ms": 73.60152699072566,
+    "offset_burst_after_marker_ms": 171.75789421540966,
+    "edge_spacing_ms": 98.15636722468399,
+    "edge_spacing_sd_ms": 6.668346269783802,
+    "sound_onset_after_marker_ms": 71.10152699072566,
+    "sound_onset_after_marker_sd_ms": 4.436422090716856,
+    "sound_onset_after_marker_ci95_ms": [
+      70.356986116208,
+      71.87926892534561
+    ],
+    "sound_onset_from_offset_edge_ms": 74.25789421540965,
+    "eeg_chain_latency_ms": 70.9410082229536,
+    "audio_latency_ms": 0.16051876777206653,
+    "audio_latency_ci95_ms": [
+      -0.5840221067455881,
+      0.9382607023920159
+    ],
+    "audio_latency_from_offset_edge_ms": 3.3168859924560534
+  },
+  "cross_check": {
+    "channel": "O1",
+    "trials": 130,
+    "trials_with_contact": 130,
+    "peak_pickup_uv_median": 119.05598263764342,
+    "onset_burst_after_marker_ms": 74.00479477647787,
+    "offset_burst_after_marker_ms": 171.1040809873328,
+    "edge_spacing_ms": 97.09928621085491,
+    "edge_spacing_sd_ms": 5.167265273737141,
+    "sound_onset_after_marker_ms": 71.50479477647787,
+    "sound_onset_after_marker_sd_ms": 3.257827417432107,
+    "sound_onset_after_marker_ci95_ms": [
+      70.96194819228054,
+      72.06523888135594
+    ],
+    "sound_onset_from_offset_edge_ms": 73.60408098733275,
+    "eeg_chain_latency_ms": 70.9410082229536,
+    "audio_latency_ms": 0.5637865535242648,
+    "audio_latency_ci95_ms": [
+      0.020939969326949637,
+      1.1242306584023365
+    ],
+    "audio_latency_from_offset_edge_ms": 2.663072764379146
+  }
+}

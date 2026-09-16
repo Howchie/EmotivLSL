@@ -242,6 +242,16 @@ supplied with `--mapping PATH`. The full reverse-engineered path and current
 caveats are in
 [`docs/flex_1_hid_path.md`](docs/flex_1_hid_path.md).
 
+The direct reader also publishes an `Epoc Flex 1.0 Display` stream: the same
+samples through a one-pole high pass (`--display-hz`, default 0.5 Hz; 0 turns the
+stream off). Flex 1.0 transmits deltas and never an absolute level, so the
+recorded stream is a bare integral that wanders by millivolts across a session
+and an autoscaled viewer shows that wander rather than the EEG. Point LSL viewers
+at the display stream; **record and analyse `Epoc Flex 1.0`**. The display copy
+has a second high pass on top of the headset's own, which costs slow ERP
+components amplitude and adds an undershoot after every large deflection, so
+`analysis/emotiv/loading.py` refuses it by name.
+
 The direct reader also publishes an always-on `Epoc Flex 1.0 Packet Diagnostics`
 LSL stream beside the EEG outlet. It contains the 7-bit packet counter,
 expected counter, per-sample gap/reset flags, cumulative missing-report counts

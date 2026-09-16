@@ -1,0 +1,147 @@
+{
+  "xdf": "data/DRT_Timing/drt_timing_P7.xdf",
+  "device": "EPOC X",
+  "eeg_clock": "arrival times fitted against the packet counter",
+  "channel": "P7",
+  "channel_source": "XDF filename suffix",
+  "event_reference": {
+    "source": "corrected PsychoPy *_ON marker timestamps (DRT CSV not exported)",
+    "csv_path": null,
+    "trials_in_csv": null,
+    "trials_in_markers": 207,
+    "on_markers_minus_csv_onsets_ms": null,
+    "csv_lag_ms": null
+  },
+  "stimulus_marker_values": [
+    "[LED.H]_ON"
+  ],
+  "method": {
+    "edge_timing": "signed-derivative centroid of the pooled onset-locked waveform",
+    "edge_search_windows_s": {
+      "onset": [
+        0.03,
+        0.13
+      ],
+      "offset": [
+        0.13,
+        0.3
+      ]
+    },
+    "offset_duration": "measured edge-to-edge from the recorded waveform; no fixed duration used"
+  },
+  "duration_hint_s": null,
+  "trials_used": 207,
+  "eeg_rate_hz": 128.0661359181173,
+  "samples": 27343,
+  "duration_s": 213.49906283954624,
+  "missing_samples": 0,
+  "marker_counts": {
+    "[LED.H]_ON": 207,
+    "[LED.H]_MISS": 207,
+    "ExpStart": 1,
+    "DRTStart": 1
+  },
+  "on_marker_intervals_ms": {
+    "mean": 1006.8759067824395,
+    "sd": 0.5884299127436422,
+    "min": 1005.1280145708006,
+    "max": 1008.749314583838
+  },
+  "features": {
+    "onset / electrical (mean of other channels)": {
+      "peak_s": 0.06975544868138632,
+      "edge_s": 0.06975544868138632,
+      "edge_peak_s": 0.06775000000000012,
+      "edge_peak_slope_uv_s": -35566.29835262374,
+      "edge_window_s": [
+        0.05950000000000011,
+        0.08050000000000013
+      ],
+      "baseline_sd": 2.7737950400643157,
+      "sign": -1,
+      "edge_ci95_s": [
+        0.06916412640393584,
+        0.07024153143073243
+      ],
+      "trial_shift_sd_ms": 1.676259854289953,
+      "trial_shift_range_ms": [
+        -4.999999999999994,
+        4.000000000000014
+      ]
+    },
+    "offset / electrical (mean of other channels)": {
+      "peak_s": 0.17627237680835076,
+      "edge_s": 0.17627237680835076,
+      "edge_peak_s": 0.1770000000000002,
+      "edge_peak_slope_uv_s": 42494.67985407496,
+      "edge_window_s": [
+        0.1655000000000002,
+        0.18625000000000022
+      ],
+      "baseline_sd": 2.7737950400643157,
+      "sign": 1,
+      "edge_ci95_s": [
+        0.17594963723968451,
+        0.1766702205003395
+      ],
+      "trial_shift_sd_ms": 1.4455065672505767,
+      "trial_shift_range_ms": [
+        -3.2499999999999925,
+        4.000000000000014
+      ]
+    },
+    "onset / P7": {
+      "peak_s": 0.07032657253581912,
+      "edge_s": 0.07032657253581912,
+      "edge_peak_s": 0.07225000000000012,
+      "edge_peak_slope_uv_s": 255977.21114597656,
+      "edge_window_s": [
+        0.06100000000000011,
+        0.07925000000000013
+      ],
+      "baseline_sd": 12.70729842289325,
+      "sign": 1,
+      "edge_ci95_s": [
+        0.06881398228387964,
+        0.07148211009214854
+      ]
+    },
+    "offset / P7": {
+      "peak_s": 0.17874350402947825,
+      "edge_s": 0.17874350402947825,
+      "edge_peak_s": 0.1775000000000002,
+      "edge_peak_slope_uv_s": -109059.9730240003,
+      "edge_window_s": [
+        0.1677500000000002,
+        0.18950000000000022
+      ],
+      "baseline_sd": 12.70729842289325,
+      "sign": -1,
+      "edge_ci95_s": [
+        0.17494861422371266,
+        0.18233757721206778
+      ]
+    }
+  },
+  "eeg_chain_latency_s": {
+    "onset_peak": 0.06975544868138632,
+    "offset_peak": 0.17627237680835076,
+    "onset_edge_s": 0.06975544868138632,
+    "offset_edge_s": 0.17627237680835076,
+    "measured_pulse_width_s": 0.10651692812696444,
+    "offset_latency_corrected_s": 0.06975544868138632,
+    "mean_of_edges": 0.06975544868138632,
+    "onset_edge_ci95_s": [
+      0.06916412640393584,
+      0.07024153143073243
+    ],
+    "offset_edge_ci95_s": [
+      0.17594963723968451,
+      0.1766702205003395
+    ],
+    "pulse_width_ci95_s": [
+      0.10594753619623488,
+      0.10723869392711015
+    ]
+  }
+}

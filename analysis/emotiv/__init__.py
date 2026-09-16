@@ -1,0 +1,63 @@
+"""Canonical loading and processing for Emotiv EPOC X and EPOC Flex 1.0 recordings.
+
+A typical analysis is one import and a handful of calls::
+
+    import emotiv as em
+
+    run = em.load("data/GnG/gng.xdf")
+    raw = em.make_raw(run)
+    bads = em.bad_channels(raw)
+    events = em.events_from_markers(run, em.split_condition({"GnG": "gng"}, ("high", "low")))
+    epochs, info = em.erp_epochs(run, raw, events, bads=bads)
+
+``erp_epochs`` has already shifted the events by the headset's chain latency, so
+t=0 is the physical stimulus and no analysis needs timing code of its own.
+
+**The EPOC X and the Flex 1.0 are different hardware and are not processed the
+same way.**  The reference, passbands, artifact thresholds and bad-channel policy
+all differ, and each headset's are in ``devices.py`` as a ``Processing`` profile.
+The shared code applies whichever profile the run's device carries; it never
+assumes one headset's settings are right for the other.  ``devices.py`` is also
+where the measured chain latency lives, so a hardware timing re-run is a one-line
+change there.
+
+Layers, if you need them directly:
+
+* ``devices``    -- channel layout, scaling, measured chain latency per headset;
+* ``loading``    -- XDF to a common ``Run``, including the EPOC X clock rebuild;
+* ``events``     -- markers to an event table;
+* ``preprocess`` -- continuous MNE data, bad spans, bad channels, spectra;
+* ``erp``        -- epoching with timing correction, peak measurement, cluster tests;
+* ``qc``         -- acquisition integrity and signal-quality checks.
+"""
+
+from __future__ import annotations
+
+from . import devices, erp, events, loading, preprocess, qc
+from .devices import DEVICES, EPOCX, FLEX, FS, SEED, Device, Processing, Timing
+from .erp import (BASELINE, ERP_WINDOW, boot_diff_ci, boot_mean_ci, bootstrap_latency,
+                  cluster_test, erp_epochs, n1_p2, peak_latency, plus_minus_rms, roi_trials)
+from .events import events_from_markers, find_eye_intervals, nearest_sample, split_condition
+from .loading import FLEX_DISPLAY_STREAM, Run, epocx_grid, load, load_epocx, load_flex
+from .preprocess import (Cleaned, bad_channels, blink_times, channel_noise,
+                         clean, clean_psd, contiguous, electrode_pops, eog_proxies, flag_windows,
+                         flex_counts, flex_deltas, good_channels, good_mask, line_check,
+                         make_raw, rail_fraction, sliding_p2p)
+from .qc import alpha_scores, alpha_spectra, cortex_band_power, integrity, pair_stats, quality_vs_noise
+from .util import to_jsonable
+
+__all__ = [
+    "devices", "loading", "events", "preprocess", "erp", "qc",
+    "Device", "Timing", "Processing", "Run", "DEVICES", "EPOCX", "FLEX", "FS", "SEED",
+    "load", "load_epocx", "load_flex", "epocx_grid", "FLEX_DISPLAY_STREAM",
+    "events_from_markers", "split_condition", "find_eye_intervals", "nearest_sample",
+    "clean", "Cleaned", "make_raw", "good_mask", "good_channels", "channel_noise",
+    "bad_channels", "clean_psd", "line_check", "blink_times", "contiguous",
+    "sliding_p2p", "flag_windows", "eog_proxies", "electrode_pops",
+    "flex_counts", "flex_deltas", "rail_fraction",
+    "erp_epochs", "roi_trials", "peak_latency", "bootstrap_latency", "n1_p2", "cluster_test",
+    "boot_mean_ci", "boot_diff_ci", "plus_minus_rms",
+    "ERP_WINDOW", "BASELINE",
+    "integrity", "quality_vs_noise", "alpha_spectra", "alpha_scores", "cortex_band_power",
+    "pair_stats", "to_jsonable",
+]

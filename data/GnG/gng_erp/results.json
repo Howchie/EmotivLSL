@@ -1,0 +1,444 @@
+{
+  "recording": "data/GnG/gng.xdf",
+  "device": "epocx",
+  "primary_roi": "frontal",
+  "p3_window_s": [
+    0.34,
+    0.49
+  ],
+  "integrity": {
+    "device": "epocx",
+    "samples_received": 124801,
+    "grid_samples": 124801,
+    "missing_samples": 0,
+    "duration_s": 974.4994523285859,
+    "dropped_repeats": 134,
+    "reader_missing_reports": 0,
+    "reader_resets": 0,
+    "diag_rows_unmatched": 0,
+    "headset_rate_hz": [
+      128.0657466782439
+    ],
+    "arrival_residual_ms_percentiles": {
+      "min": -0.92,
+      "p1": -0.84,
+      "p50": -0.19,
+      "p99": 3.58,
+      "max": 70.17
+    },
+    "decoder_max_fraction": 0.0018559806794655742,
+    "raw_count_range": [
+      -2734,
+      6025
+    ],
+    "rail_samples": 0,
+    "pct_1s_windows_ptp_over_400uv": {
+      "AF3": 0.0,
+      "F7": 0.0,
+      "F3": 0.0,
+      "FC5": 0.0,
+      "T7": 0.0,
+      "P7": 0.0,
+      "O1": 0.0,
+      "O2": 0.0,
+      "P8": 0.0,
+      "T8": 0.0,
+      "FC6": 0.0,
+      "F4": 0.0,
+      "F8": 0.0,
+      "AF4": 0.0
+    }
+  },
+  "preprocessing": {
+    "bad_channels": [
+      "F4"
+    ],
+    "good_channels": [
+      "AF3",
+      "F7",
+      "F3",
+      "FC5",
+      "T7",
+      "P7",
+      "O1",
+      "O2",
+      "P8",
+      "T8",
+      "FC6",
+      "F8",
+      "AF4"
+    ],
+    "ica_excluded": [
+      1,
+      2
+    ],
+    "rail_pct_by_channel": {},
+    "ica_corr_max": {
+      "VEOG": 0.7665532346093107,
+      "HEOG": 0.7202079713544894
+    },
+    "ica_corr_excluded": {
+      "VEOG": [
+        -0.7665532346093107,
+        -0.09203954707361166
+      ],
+      "HEOG": [
+        -0.056292331254361734,
+        0.7202079713544894
+      ]
+    },
+    "pops_per_min": {
+      "AF3": 0.0,
+      "F7": 0.0,
+      "F3": 0.0,
+      "FC5": 0.0,
+      "T7": 0.0,
+      "P7": 0.0,
+      "O1": 0.0,
+      "O2": 0.0,
+      "P8": 0.0,
+      "T8": 0.0,
+      "FC6": 0.0,
+      "F4": 1.5681752666474489,
+      "F8": 0.0,
+      "AF4": 0.09224560392043818
+    },
+    "pct_task_gross": 1.5565786943291213,
+    "pct_task_residual": 4.836027556872816,
+    "task_minutes": 11.510286458333333,
+    "residual_share_by_channel": {
+      "AF3": 0.00870195794053662,
+      "F7": 0.011602610587382161,
+      "F3": 0.009427121102248005,
+      "FC5": 0.009427121102248005,
+      "T7": 0.007976794778825236,
+      "P7": 0.007976794778825236,
+      "O1": 0.007976794778825236,
+      "O2": 0.00870195794053662,
+      "P8": 0.00870195794053662,
+      "T8": 0.01015228426395939,
+      "FC6": 0.01740391588107324,
+      "F4": 0.06091370558375635,
+      "F8": 0.016678752719361856,
+      "AF4": 0.02030456852791878
+    },
+    "parameters": {
+      "device": "epocx",
+      "profile_source": "EPOCX_ERP_PIPELINE.md, derived on data/GnG/gng.xdf",
+      "profile_validated": true,
+      "ica_band": [
+        1.0,
+        30.0
+      ],
+      "erp_band": [
+        0.1,
+        20.0
+      ],
+      "gross_uv": 300.0,
+      "residual_uv": 100.0,
+      "win_s": 1.0,
+      "step_s": 0.5,
+      "fill_pad": [
+        0.25,
+        0.5
+      ],
+      "eog_r": 0.5,
+      "channel_bad_share": 0.1,
+      "pop_uv": 60.0,
+      "rail_pct": null,
+      "manual_bads": {
+        "F4": "old saline pad: recurring electrode pops"
+      },
+      "reference": "recorded",
+      "reference_why": "The 14 sensors form a ring with no midline site, so a broad vertex-centred component such as the P3 reaches all of them.  An average reference subtracts most of it and flips P7/P8/O1/O2 negative.  Measured on gng.xdf: every channel positive at the Go-NoGo peak, channel mean +4.2 uV.",
+      "bad_channel_handling": "drop",
+      "eog_proxies_used": [
+        "HEOG",
+        "VEOG"
+      ],
+      "seed": 7
+    }
+  },
+  "timing": {
+    "chain_latency_s": 0.06975544868138632,
+    "shift_samples": 9,
+    "timing_source": "DRT LED timing, data/DRT_Timing/drt_timing/results.json (207-trial P7 run; slope-centroid onset, offset and data-measured pulse width)",
+    "reference": "recorded",
+    "bad_channel_handling": "drop",
+    "bad_channels": [
+      "F4"
+    ],
+    "drops": {
+      "BAD_residual": 23
+    },
+    "n_epochs": 372,
+    "n_by_condition": {
+      "go": 70,
+      "nogo": 302
+    }
+  },
+  "behaviour": {
+    "go_trials": 80,
+    "nogo_trials": 320,
+    "hits": 75,
+    "false_alarms": 0,
+    "hit_rate": 0.9375,
+    "false_alarm_rate": 0.0,
+    "rt_reference": "from the tone marker; audio-output latency for this session is unmeasured",
+    "rt_median_s": 0.48341109442365926,
+    "rt_iqr_s": [
+      0.46388536066288943,
+      0.5109158016336381
+    ]
+  },
+  "rois": {
+    "frontal": {
+      "roi": [
+        "F3",
+        "FC5",
+        "FC6"
+      ],
+      "n_go": 70,
+      "n_nogo": 302,
+      "go_minus_nogo_uv": 4.150178801325581,
+      "ci95_uv": [
+        1.4713848160521805,
+        6.817980265827157
+      ],
+      "window_s": [
+        0.34,
+        0.49
+      ],
+      "peak_latency_s": 0.421875,
+      "peak_latency_ci95_s": [
+        0.3671875,
+        0.4296875
+      ],
+      "peak_uv": 5.990089085086991,
+      "baseline_rms_uv": 0.3631661464759937,
+      "plus_minus_rms_uv": 0.6463901919203492
+    },
+    "posterior": {
+      "roi": [
+        "O1",
+        "O2",
+        "P7",
+        "P8"
+      ],
+      "n_go": 70,
+      "n_nogo": 302,
+      "go_minus_nogo_uv": 0.7728225573687583,
+      "ci95_uv": [
+        -1.2033138147228204,
+        2.8021469684804
+      ],
+      "window_s": [
+        0.34,
+        0.49
+      ],
+      "peak_latency_s": 0.421875,
+      "peak_latency_ci95_s": [
+        0.3828125,
+        0.4296875
+      ],
+      "peak_uv": 2.7781023942359657,
+      "baseline_rms_uv": 0.38707505915433893,
+      "plus_minus_rms_uv": 0.43689364824376653
+    },
+    "inferior": {
+      "roi": [
+        "T7",
+        "T8",
+        "P7",
+        "P8"
+      ],
+      "n_go": 70,
+      "n_nogo": 302,
+      "go_minus_nogo_uv": 1.244497787821703,
+      "ci95_uv": [
+        -0.6712246311168041,
+        3.2456326444043504
+      ],
+      "window_s": [
+        0.34,
+        0.49
+      ],
+      "peak_latency_s": 0.421875,
+      "peak_latency_ci95_s": [
+        0.359375,
+        0.4375
+      ],
+      "peak_uv": 2.2184241464802628,
+      "baseline_rms_uv": 0.3273930810261397,
+      "plus_minus_rms_uv": 0.4957336136693515
+    }
+  },
+  "topography_at_primary_peak": {
+    "reference": "recorded",
+    "same_sign_test_meaningful": true,
+    "per_channel_uv": {
+      "AF3": 4.895747883283729,
+      "F7": 4.734431540921413,
+      "F3": 6.953246988997152,
+      "FC5": 4.703933236627155,
+      "T7": 2.801872193702847,
+      "P7": 2.4445842717954323,
+      "O1": 3.8972229747566267,
+      "O2": 3.386262520341785,
+      "P8": 1.3843398100500204,
+      "T8": 2.2429003103727534,
+      "FC6": 6.313087029636677,
+      "F8": 5.184909888002999,
+      "AF4": 5.721671927546039
+    },
+    "channel_mean_uv": 4.204939275079587,
+    "all_channels_same_sign": true
+  },
+  "clusters": [
+    {
+      "p": 0.0025,
+      "sign": "positive",
+      "t_start": 0.3515625,
+      "t_end": 0.4453125,
+      "channels": [
+        "AF3",
+        "AF4",
+        "F3",
+        "F7",
+        "F8",
+        "FC5",
+        "FC6",
+        "O1",
+        "P7",
+        "T7"
+      ],
+      "mass": 314.43533533342685
+    },
+    {
+      "p": 0.011,
+      "sign": "negative",
+      "t_start": 0.203125,
+      "t_end": 0.3125,
+      "channels": [
+        "AF3",
+        "AF4",
+        "F3",
+        "FC6",
+        "O1",
+        "O2",
+        "P8",
+        "T8"
+      ],
+      "mass": 172.92206649081237
+    },
+    {
+      "p": 0.0945,
+      "sign": "positive",
+      "t_start": 0.7890625,
+      "t_end": 0.828125,
+      "channels": [
+        "O2",
+        "P8",
+        "T8"
+      ],
+      "mass": 34.984263831433864
+    },
+    {
+      "p": 0.138,
+      "sign": "negative",
+      "t_start": 0.5546875,
+      "t_end": 0.578125,
+      "channels": [
+        "FC5",
+        "T7"
+      ],
+      "mass": 20.680614575459618
+    },
+    {
+      "p": 0.2515,
+      "sign": "positive",
+      "t_start": 0.6796875,
+      "t_end": 0.6953125,
+      "channels": [
+        "F7"
+      ],
+      "mass": 9.049683199293346
+    },
+    {
+      "p": 0.255,
+      "sign": "negative",
+      "t_start": 0.5,
+      "t_end": 0.5078125,
+      "channels": [
+        "O1",
+        "O2"
+      ],
+      "mass": 8.82759675475312
+    },
+    {
+      "p": 0.377,
+      "sign": "positive",
+      "t_start": 0.6875,
+      "t_end": 0.6953125,
+      "channels": [
+        "F8"
+      ],
+      "mass": 5.551689221040492
+    },
+    {
+      "p": 0.4625,
+      "sign": "positive",
+      "t_start": 0.9765625,
+      "t_end": 0.984375,
+      "channels": [
+        "P8"
+      ],
+      "mass": 5.281654744818041
+    },
+    {
+      "p": 0.545,
+      "sign": "positive",
+      "t_start": 0.8046875,
+      "t_end": 0.8046875,
+      "channels": [
+        "AF4"
+      ],
+      "mass": 2.719438165005362
+    }
+  ],
+  "nogo_n1_p2": {
+    "n_trials": 302,
+    "n1_latency_s": 0.2109375,
+    "n1_ci95": [
+      0.203125,
+      0.2109375
+    ],
+    "p2_latency_s": 0.296875,
+    "p2_ci95": [
+      0.28125,
+      0.3125
+    ],
+    "n1_amp_uv": -2.661972042178917,
+    "p2_amp_uv": 4.144616080906074
+  },
+  "blocks_primary": {
+    "block0": {
+      "n_go": 34,
+      "n_nogo": 154,
+      "go_minus_nogo_uv": 5.19197312729693,
+      "ci95_uv": [
+        1.872929592511023,
+        8.461932986792467
+      ]
+    },
+    "block1": {
+      "n_go": 36,
+      "n_nogo": 148,
+      "go_minus_nogo_uv": 3.1869513046541686,
+      "ci95_uv": [
+        -1.0224567683582395,
+        7.4696310681720055
+      ]
+    }
+  }
+}

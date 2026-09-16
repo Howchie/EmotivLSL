@@ -14,6 +14,12 @@ accumulator is carried across a gap by default so loss does not create a
 midpoint step in every channel.  The accumulator is a pure, unclamped integral:
 the protocol sends no absolute level, so each lost report leaves a constant
 offset, but correctly decoded deltas do not drift.
+
+Because that integral has no anchor it wanders by millivolts over a session, so
+an autoscaled viewer shows the wander and not the EEG.  A second, viewer-only
+outlet (``Epoc Flex 1.0 Display``) carries the same samples through a one-pole
+high pass.  Record and analyse the plain ``Epoc Flex 1.0`` stream; the display
+copy has an extra high pass in it and the analysis loader refuses it by name.
 """
 
 from __future__ import annotations
@@ -48,6 +54,19 @@ from emotiv_lsl.emotiv_base import (
 # that want a bounded signal.
 DEFAULT_DC_RESTORE_HZ = 0.0
 
+# The recorded stream is a pure integral, so it wanders by millivolts over a
+# session and an autoscaled viewer shows that wander rather than the EEG: a 50 uV
+# feature is under 1% of the trace.  The display stream is the same samples run
+# through a one-pole high pass -- the leaky accumulator the reader used to apply
+# to the archive -- so a viewer sees something with a flat baseline.  It costs one
+# multiply-add per channel per sample and never touches what is recorded.
+#
+# 0.5 Hz settles in ~0.3 s and keeps the transients worth looking at: on the
+# on-head DRT run the pooled edge measured 5.9 uV through a 0.5 Hz high pass
+# against 5.6 uV at 2 Hz and 0.4 uV at 10 Hz.
+DEFAULT_DISPLAY_HZ = 0.5
+DISPLAY_STREAM_NAME = "Epoc Flex 1.0 Display"
+
 
 @dataclass(frozen=True)
 class DecodedReport:
@@ -57,6 +76,9 @@ class DecodedReport:
     fill_diagnostics: list[PacketDiagnostics]
     sample: list[float]
     diagnostics: PacketDiagnostics
+    # High-passed copies of the same samples, for the display stream only.
+    fill_displays: list[list[float]]
+    display: list[float]
 
 
 class EmotivFlex(EmotivBase):
@@ -93,6 +115,7 @@ class EmotivFlex(EmotivBase):
         serial_number: str | None = None,
         reset_on_gap: bool = False,
         dc_restore_hz: float = DEFAULT_DC_RESTORE_HZ,
+        display_hz: float = DEFAULT_DISPLAY_HZ,
     ) -> None:
         self.cipher: AES | None = None
         self.remove_dc = remove_dc
@@ -124,7 +147,17 @@ class EmotivFlex(EmotivBase):
             if str(value).strip()
         }
         self.serial_number = serial_number.strip() if serial_number else None
+        self.display_hz = float(display_hz)
+        if self.display_hz < 0:
+            raise ValueError("display_hz must not be negative")
+        self._display_leak = (
+            1.0
+            if self.display_hz == 0
+            else math.exp(-2 * math.pi * self.display_hz / self.SAMPLE_RATE)
+        )
         self._adc = [float(self.ADC_MIDPOINT)] * len(self.CH_NAMES)
+        # Same integral, leaked toward zero; published on the display stream only.
+        self._display = [0.0] * len(self.CH_NAMES)
         self._last_counter: int | None = None
         self.packet_gaps = 0
         self.missing_reports = 0
@@ -294,12 +327,14 @@ class EmotivFlex(EmotivBase):
         self._last_counter = counter
 
         fills: list[list[float]] = []
+        fill_displays: list[list[float]] = []
         fill_diagnostics: list[PacketDiagnostics] = []
         missing = diagnostics.missing_reports
         if missing and missing <= self.FILL_LIMIT_SECONDS * self.SAMPLE_RATE:
             for offset in range(1, missing + 1):
                 self._decay(1)
                 fills.append(self._output())
+                fill_displays.append(self._display_output())
                 fill_diagnostics.append(
                     diagnostics.filled_sample((previous_counter + offset) % self.PACKET_COUNTER_MODULUS)
                 )
@@ -313,6 +348,7 @@ class EmotivFlex(EmotivBase):
             # artificial step in every channel.  A dropped repeat loses
             # nothing, so it never resets.
             self._adc = [float(self.ADC_MIDPOINT)] * len(self.CH_NAMES)
+            self._display = [0.0] * len(self.CH_NAMES)
 
         # No clamp: the state is an integral from an arbitrary start, not an
         # ADC reading, so the 14-bit range does not bound it.  Offsets left by
@@ -320,8 +356,12 @@ class EmotivFlex(EmotivBase):
         for index, delta in enumerate(self.unpack_signed_deltas(plaintext)):
             centered = (self._adc[index] - self.ADC_MIDPOINT) * self._leak + delta
             self._adc[index] = self.ADC_MIDPOINT + centered
+            self._display[index] = self._display[index] * self._display_leak + delta
 
-        return DecodedReport(fills, fill_diagnostics, self._output(), diagnostics)
+        return DecodedReport(
+            fills, fill_diagnostics, self._output(), diagnostics,
+            fill_displays, self._display_output(),
+        )
 
     def _decay(self, samples: int) -> None:
         """Apply ``samples`` zero-delta steps of the DC restore."""
@@ -330,6 +370,8 @@ class EmotivFlex(EmotivBase):
             self.ADC_MIDPOINT + (value - self.ADC_MIDPOINT) * factor
             for value in self._adc
         ]
+        display_factor = self._display_leak ** samples
+        self._display = [value * display_factor for value in self._display]
 
     def _output(self) -> list[float]:
         if self.remove_dc:
@@ -338,6 +380,9 @@ class EmotivFlex(EmotivBase):
                 for value in self._adc
             ]
         return [value * self.LSB_UV for value in self._adc]
+
+    def _display_output(self) -> list[float]:
+        return [value * self.LSB_UV for value in self._display]
 
     def validate_data(self, data) -> bool:
         return self.normalize_packet(data) is not None
@@ -350,6 +395,39 @@ class EmotivFlex(EmotivBase):
             self.SAMPLE_RATE,
             "float32",
         )
+        self._describe(info)
+        return info
+
+    def get_display_stream_info(self) -> StreamInfo:
+        """A viewer-only copy of the EEG stream, high-passed at ``display_hz``.
+
+        Nothing should be analysed from this stream: it has a second high pass on
+        top of the headset's, which costs slow ERP components amplitude and adds
+        an undershoot after every large deflection.  ``analysis/emotiv/loading.py``
+        refuses it by name.  It exists because the recorded stream is a bare
+        integral and an autoscaled viewer shows only its millivolt wander.
+        """
+
+        info = StreamInfo(
+            DISPLAY_STREAM_NAME,
+            "EEG",
+            len(self.CH_NAMES),
+            self.SAMPLE_RATE,
+            "float32",
+        )
+        cap = self._describe(info)
+        cap.append_child_value("purpose", "display only; not for analysis")
+        cap.append_child_value("display_highpass_hz", str(self.display_hz))
+        info.desc().append_child_value(
+            "warning",
+            f"one-pole {self.display_hz} Hz high pass on top of the headset's own; "
+            "analyse 'Epoc Flex 1.0' instead",
+        )
+        return info
+
+    def _describe(self, info: StreamInfo):
+        """Channel and cap metadata shared by the recorded and display streams."""
+
         channels = info.desc().append_child("channels")
         for wire_label, label in zip(self.CH_NAMES, self.channel_labels):
             channel = channels.append_child("channel")
@@ -374,7 +452,7 @@ class EmotivFlex(EmotivBase):
             "headset counter clock; lost samples filled (see FILLED in the diagnostics stream)",
         )
         declare_can_drop_samples(info)
-        return info
+        return cap
 
     def get_packet_diagnostics_stream_info(self) -> StreamInfo:
         return make_packet_diagnostics_stream_info(
@@ -392,6 +470,9 @@ class EmotivFlex(EmotivBase):
     def main_loop(self) -> None:
         outlet = StreamOutlet(self.get_stream_info())
         diagnostics_outlet = StreamOutlet(self.get_packet_diagnostics_stream_info())
+        display_outlet = (
+            StreamOutlet(self.get_display_stream_info()) if self.display_hz else None
+        )
         loss_reporter = PacketLossReporter('Epoc Flex 1.0')
         device = self.get_hid_device()
         hid_device = hid.device()
@@ -402,11 +483,19 @@ class EmotivFlex(EmotivBase):
             file=sys.stderr,
             flush=True,
         )
+        if display_outlet is not None:
+            print(
+                f"Also publishing {DISPLAY_STREAM_NAME!r}: the same samples high-passed "
+                f"at {self.display_hz} Hz, for viewers only -- record and analyse "
+                "'Epoc Flex 1.0'.",
+                file=sys.stderr,
+                flush=True,
+            )
 
         # Samples wait here until the counter clock has stamped them; after a
         # long dropout that takes CounterClock.RESTART_HOLD_SECONDS.
         clock = CounterClock(self.SAMPLE_RATE)
-        pending: deque[tuple[list[float], list[float]]] = deque()
+        pending: deque[tuple[list[float], list[float], list[float]]] = deque()
         last_arrival: float | None = None
 
         try:
@@ -427,9 +516,13 @@ class EmotivFlex(EmotivBase):
                 report = self.decode_report(plaintext, elapsed)
                 loss_reporter.report(report.diagnostics)
 
-                for values, diagnostics in zip(report.fills, report.fill_diagnostics):
-                    pending.append((values, diagnostics.as_lsl_sample()))
-                pending.append((report.sample, report.diagnostics.as_lsl_sample()))
+                for values, display, diagnostics in zip(
+                    report.fills, report.fill_displays, report.fill_diagnostics
+                ):
+                    pending.append((values, display, diagnostics.as_lsl_sample()))
+                pending.append(
+                    (report.sample, report.display, report.diagnostics.as_lsl_sample())
+                )
                 missing = report.diagnostics.missing_reports
                 clock.add(
                     arrival,
@@ -438,8 +531,10 @@ class EmotivFlex(EmotivBase):
                     fill=len(report.fills) == missing,
                 )
                 for timestamp in clock.take_ready():
-                    values, diagnostics_sample = pending.popleft()
+                    values, display, diagnostics_sample = pending.popleft()
                     outlet.push_sample(values, timestamp=timestamp)
                     diagnostics_outlet.push_sample(diagnostics_sample, timestamp=timestamp)
+                    if display_outlet is not None:
+                        display_outlet.push_sample(display, timestamp=timestamp)
         finally:
             hid_device.close()

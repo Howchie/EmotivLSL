@@ -3,7 +3,11 @@
 import argparse
 from pathlib import Path
 
-from emotiv_lsl.emotiv_flex import DEFAULT_DC_RESTORE_HZ, EmotivFlex
+from emotiv_lsl.emotiv_flex import (
+    DEFAULT_DC_RESTORE_HZ,
+    DEFAULT_DISPLAY_HZ,
+    EmotivFlex,
+)
 from emotiv_lsl.flex_montage import load_flex_montage
 
 
@@ -49,6 +53,19 @@ if __name__ == "__main__":
             "normally leave disabled)"
         ),
     )
+    parser.add_argument(
+        "--display-hz",
+        type=float,
+        default=DEFAULT_DISPLAY_HZ,
+        metavar="HZ",
+        help=(
+            "high-pass corner of the viewer-only 'Epoc Flex 1.0 Display' stream "
+            f"(default: {DEFAULT_DISPLAY_HZ}; 0 publishes no display stream).  The "
+            "recorded stream is a bare integral that wanders by millivolts, so a "
+            "viewer needs a high-passed copy to show anything.  Record and analyse "
+            "'Epoc Flex 1.0', never the display stream"
+        ),
+    )
     args = parser.parse_args()
     montage = load_flex_montage(args.mapping)
     print(
@@ -63,4 +80,5 @@ if __name__ == "__main__":
         serial_number=args.serial,
         reset_on_gap=args.reset_on_gap,
         dc_restore_hz=args.dc_restore_hz,
+        display_hz=args.display_hz,
     ).main_loop()
