@@ -11,21 +11,21 @@ cleaned  = em.clean(run, task_mask=..., manual_bads={"F4": "old saline pad"})
 epochs, timing = em.erp_epochs(run, cleaned, events)
 ```
 
-**This document describes the EPOC X profile only.** The Flex 1.0 is different hardware — different noise floor, dynamic range, decoder and montage — and is processed differently: average reference, interpolated bad channels, a 0.1–30 Hz ERP band. Those choices live in `devices.FLEX_PROCESSING` and must not be copied from here. `emotiv/preprocess.py` and `emotiv/erp.py` supply only the mechanisms; every band, threshold, reference and policy comes from `run.dev.processing`.
+**This document describes the EPOC X profile only.** The Flex 1.0 is different hardware — different noise floor, dynamic range, decoder and montage — and is processed differently: its recorded CMS reference, interpolated bad channels, and a 0.1–30 Hz ERP band. Those choices live in `devices.FLEX_PROCESSING` and must not be copied from here. `emotiv/preprocess.py` and `emotiv/erp.py` supply only the mechanisms; every band, threshold, reference and policy comes from `run.dev.processing`.
 
 The differences that matter most:
 
 | | EPOC X | Flex 1.0 |
 |---|---|---|
-| Reference | recorded (CMS) | **average** |
+| Reference | recorded (CMS) | recorded (CMS) |
 | Bad channels | dropped | interpolated |
 | ERP band | 0.1–20 Hz | 0.1–30 Hz |
 | Epoch | −0.3–1.0 s | −0.2–1.0 s |
-| Residual p2p | 100 µV | 150 µV (not re-derived) |
-| Fill pad | 0.25/0.5 s | 0.25/**1.0** s (0.16 Hz leak, tau ~1 s) |
-| HEOG pair | F7−F8 | none fixed; set per session |
+| Residual p2p | 100 µV | 120 µV (re-derived) |
+| Fill pad | 0.25/0.5 s | 0.25/0.5 s (no DC-restore tail) |
+| HEOG pair | F7−F8 | F7−F8 default; verify per session |
 
-The Flex profile is marked `validated=False`: it preserves what `flex_sanity.py` actually did, but its artifact thresholds were never re-derived on a Flex recording. `clean()` warns when a profile is unvalidated, and `eog_proxies` warns when no HEOG pair is available rather than silently skipping saccade removal.
+The Flex profile is marked validated: its reference, artifact thresholds and rail/fill handling were re-derived on the available Flex recordings. A new montage should still provide its own HEOG pair; `eog_proxies` warns when that pair is unavailable rather than silently skipping saccade removal.
 
 Pipeline parameters are overridable per call; every run writes the values it used to `results.json → preprocessing.parameters`, including which device profile and which EOG proxies were used. Per-headset constants, including the measured chain latency, are in `emotiv/devices.py`.
 
@@ -42,12 +42,12 @@ The pipeline exists because the first analysis of this recording (codex, since r
 
 | Step | What | Why |
 |---|---|---|
-| Sample grid | `emotiv.loading.epocx_grid`: rebuild the regular grid from the packet counter and fit arrival times against it. Lost samples are interpolated and flagged `FILLED`, which becomes a `BAD_fill` annotation. | LSL arrival timestamps jitter, and pyxdf dejittering bridges gaps incorrectly (commit 184a6d7). |
-| Markers | Deduplicate identical (time, value) pairs across marker streams. Match task markers to CSV rows in order, and assert that stimulus identity and counts agree. | LabRecorder can record the same outlet twice. |
-| Sound onset on the EEG timeline | marker + chain latency, applied by `erp_epochs`. Adding to the event time is the same as subtracting the delay from ERP latencies. | EPOC X samples are stamped one **chain latency** after the scalp event (`devices.EPOCX.timing`). |
+| Sample grid | `emotiv.loading.epocx_grid`: rebuild the regular grid from the packet counter and fit arrival times against it. The whole-recording fitted rate is carried on `Run.sfreq_hz`; lost samples are interpolated and flagged `FILLED`, which becomes a `BAD_fill` annotation. | LSL arrival timestamps jitter, and pyxdf dejittering bridges gaps incorrectly (commit 184a6d7). |
+| Markers | Deduplicate identical (time, value) pairs across marker streams, then shift **all** markers by the fixed hardware chain latency. Match task markers to CSV rows in order, and assert that stimulus identity and counts agree. | LabRecorder can record the same outlet twice; all downstream block/rest/task analyses then share one raw-EEG time base. |
+| Sound onset on the EEG timeline | Hardware latency is applied once by the loader. `erp_epochs` applies only an optional session-specific audio-path residual. | EPOC X samples are stamped one **chain latency** after the scalp event (`devices.EPOCX.timing`). |
 | RT | (`choice_resp.rt` − `soa`), 0–1 frame short, **from the marker**. | There is no keypress marker, and PsychoPy resets the keyboard clock on the routine's first flip. Converting to RT-from-sound needs that session's audio latency; the chain latency does **not** enter, because it delays the EEG, not the keypress. |
 
-**Timing.** `erp_epochs` shifts events by `run.dev.timing.latency_s` and records what it used in its `info` dict, so t=0 on every epoch is the physical stimulus. Updating `emotiv/devices.py` after a hardware test re-run updates every analysis. If a device's latency is marked provisional, `erp_epochs` raises rather than silently epoching on uncorrected markers.
+**Timing.** Loading shifts every marker by `run.dev.timing.latency_s` and records it as `run.marker_shift_s`, so t=0 on every epoch is the physical stimulus. `erp_epochs` records and applies only any explicit additional audio-path correction. Updating `emotiv/devices.py` after a hardware test re-run updates every analysis.
 
 **Audio path.** Chain latency and audio-output latency are separate delays and are measured separately:
 
@@ -55,6 +55,11 @@ The pipeline exists because the first analysis of this recording (codex, since r
 - **`analysis/headphone_timing.py`** injects the tone electrically into a sensor and times it the same way, then subtracts the chain: the **audio output**. On the WASAPI exclusive-mode `sounddevice` stream this came out at 0.2 ms [−0.6, 0.9], i.e. negligible, so for sessions on that stack the chain latency alone is the whole correction.
 - **`gng.xdf` predates that fix.** It used an earlier `sounddevice` path whose audio latency was never measured and is suspected to be ~60 ms, from the N1 arriving that much later than the PTB headphone runs. Its latencies therefore still carry an unmodelled audio delay; amplitudes, topographies and statistics are unaffected.
 - **Per-session check.** The reference-free N1 (frontal minus inferior, frequent tones, `erp.n1_p2`) is the in-session sanity check on the audio path. Compare it against a previous session on the same audio stack.
+
+Task-time QC uses the union of robustly paired `BlockStart-*`/`BlockEnd-*`
+intervals rather than one first-to-last envelope, so between-block rest does not
+inflate artifact percentages. Incomplete or repeated pairs are reported in the
+task behaviour diagnostics; complete intervals remain usable.
 
 ## 1. Bad channels
 
@@ -68,9 +73,9 @@ A channel is bad if any of these holds:
 
 **Electrode-pop diagnostic** (`emotiv.preprocess.electrode_pops`). It counts peaks of |channel − median of the other channels| above 60 µV at 1–20 Hz, with ±0.5 s around blinks masked. A pad that is drying out gives a stereotyped waveform: a ~200 ms ramp, a sharp spike, then a ~50 µV offset that recovers over ~2 s. These pops recur at shrinking intervals; F4 in `gng.xdf` went from about 45 s to 30 s apart, 1.6 pops/min. Any channel above ~0.5 pops/min should be re-wetted or have its pad replaced before the next recording.
 
-## 2. Gross artifacts (excluded from the ICA fit only)
+## 2. Gross artifacts (excluded from ICA and final epoching)
 
-1–30 Hz data, 1-s windows with a 0.5-s step, peak-to-peak above **300 µV** on any good channel, padded by 0.25 s before and 0.5 s after. These are movement bursts and pops, which would pull ICA components toward themselves. Blinks (≤ ~250 µV at AF3/AF4) stay in, so ICA can learn them. In `gng.xdf` this excluded 1.4% of task time.
+1–30 Hz data, 1-s windows with a 0.5-s step, peak-to-peak above **300 µV** on any good channel, padded by 0.25 s before and 0.5 s after. These are movement bursts and pops, which would pull ICA components toward themselves. Blinks (≤ ~250 µV at AF3/AF4) stay in, so ICA can learn them. The resulting `BAD_gross` annotations are retained on the final raw object, so overlapping epochs are rejected as well as excluded from the ICA fit.
 
 ## 3. ICA: blinks **and** saccades
 
@@ -153,7 +158,7 @@ If motor activity has to be excluded, change the task rather than the analysis:
 |---|---|---|
 | `ICA_BAND` | 1–30 Hz | ICA fit |
 | `ERP_BAND` | 0.1–20 Hz | ERPs |
-| `GROSS_UV` | 300 µV | 1-s p2p, excluded from the ICA fit |
+| `GROSS_UV` | 300 µV | 1-s p2p, excluded from ICA and final epoching |
 | `RESIDUAL_UV` | 100 µV | 1-s p2p after ICA, BAD_residual |
 | `WIN_S`, `STEP_S` | 1.0 s, 0.5 s | artifact windows |
 | `PAD_S` | 0.25 s before, 0.5 s after | around flagged windows |

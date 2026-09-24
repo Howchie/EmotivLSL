@@ -11,8 +11,10 @@ The two headsets need different work to get a trustworthy time axis:
 * **EPOC X** streams arrival times and does not fill lost samples, so the regular
   sample grid is rebuilt from the packet counter and the arrival times are fitted
   against it.
-* **Flex 1.0** fills lost samples itself and flags them, so its timestamps are
-  used as recorded and the fill flags become BAD annotations downstream.
+* **Flex 1.0** fills lost samples itself and flags them.  Its packet timestamps
+  are fit over the whole recording to measure the effective rate; a regular
+  grid at that rate is exposed for event matching, while the fill flags become
+  BAD annotations downstream.
 """
 
 from __future__ import annotations
@@ -46,7 +48,8 @@ def stream_labels(stream: dict) -> list[str]:
 class Run:
     """One recording on a common time base.
 
-    ``t`` is seconds from the first sample, and marker times use the same origin.
+    ``t`` is seconds from the first sample, and marker times use the same raw-EEG
+    origin after the fixed hardware delay has been applied.
     """
 
     device: str
@@ -60,6 +63,10 @@ class Run:
     eq: pd.DataFrame | None = None  # Cortex EEG quality
     pow: pd.DataFrame | None = None  # Cortex band power
     extra: dict = field(default_factory=dict)  # device-specific loader diagnostics
+    # Effective rate fitted from the complete recorded EEG time base.  ``FS`` is
+    # the device's nominal rate; this is the rate that maps sample indices to the
+    # LSL clock used by the markers.
+    sfreq_hz: float = FS
     # Flex decoder settings, read from the stream's cap metadata when present.
     # The reader gained that metadata in the same commit (a3f1084) that moved the
     # delta zero to 63 and turned the DC restore off, so a file carrying neither
@@ -83,11 +90,31 @@ class Run:
     def leak(self) -> float:
         """Flex DC-restore leak per sample."""
 
-        return math.exp(-2 * math.pi * self.dc_restore_hz / FS)
+        return math.exp(-2 * math.pi * self.dc_restore_hz / self.sfreq_hz)
 
     @property
     def duration_s(self) -> float:
         return float(self.t[-1])
+
+    @property
+    def sfreq(self) -> float:
+        """Alias matching MNE's ``info['sfreq']`` terminology."""
+
+        return float(self.sfreq_hz)
+
+    @property
+    def marker_shift_s(self) -> float:
+        """Fixed hardware delay already applied to every loaded marker."""
+
+        return float(self.extra.get("marker_shift_s", 0.0))
+
+    def shift_markers(self, delta_s: float) -> None:
+        """Apply an explicit marker-time adjustment to every marker in-place."""
+
+        if delta_s:
+            self.markers = self.markers.copy()
+            self.markers["time"] += float(delta_s)
+            self.extra["marker_shift_s"] = self.marker_shift_s + float(delta_s)
 
 
 # ---------------------------------------------------------------------------
@@ -102,12 +129,17 @@ def _open(path: str) -> dict:
     return by_name
 
 
-def _markers(by_name: dict, t0: float) -> pd.DataFrame:
+def _markers(by_name: dict, t0: float, shift_s: float = 0.0) -> pd.DataFrame:
     # LabRecorder can pick the same marker outlet up twice; keep one copy of each.
     rows = set()
     for stream in by_name.get("PsychoPy Markers", []):
         for ts, value in zip(stream["time_stamps"], stream["time_series"]):
-            rows.add((round(float(ts) - t0, 4), str(value[0])))
+            # Markers are sent at the physical event, while the EEG sample that
+            # carries that event appears after the fixed hardware chain delay.
+            # Shift every marker once here so block, rest and stimulus markers all
+            # share raw EEG time.  Session-specific audio corrections remain an
+            # explicit per-epoch addition in the task scripts.
+            rows.add((round(float(ts) - t0 + shift_s, 4), str(value[0])))
     return pd.DataFrame(sorted(rows), columns=["time", "value"])
 
 
@@ -136,6 +168,18 @@ def robust_line(x: np.ndarray, y: np.ndarray, tol: float) -> np.ndarray:
         res = y - np.polyval(fit, x)
         keep = np.abs(res - np.median(res[keep])) < tol
     return fit
+
+
+def _effective_rate(timestamps: np.ndarray, tol: float = 0.004) -> tuple[float, np.ndarray]:
+    """Fit one robust whole-recording sample rate and return residuals in seconds."""
+
+    timestamps = np.asarray(timestamps, float)
+    if len(timestamps) < 2 or not np.isfinite(timestamps).all():
+        raise ValueError("cannot estimate a sample rate from fewer than two finite timestamps")
+    index = np.arange(len(timestamps), dtype=float)
+    fit = robust_line(index, timestamps, tol)
+    residual = timestamps - np.polyval(fit, index)
+    return float(1.0 / fit[0]), residual
 
 
 def epocx_grid(eeg: dict, diag_stream: dict) -> dict:
@@ -179,7 +223,10 @@ def epocx_grid(eeg: dict, diag_stream: dict) -> dict:
     # is invisible to the counter, so long arrival gaps add cycles.
     steps = np.diff(counter) % 128
     steps[steps == 0] = 128
-    gap_periods = np.diff(t_arrival) * 128.0656
+    # This is only used to identify whole lost cycles.  Estimate the cadence from
+    # this recording first instead of baking in one EPOC X file's rate.
+    rate_guess, _ = _effective_rate(t_arrival)
+    gap_periods = np.diff(t_arrival) * rate_guess
     extra_cycles = np.maximum(0, np.round((gap_periods - steps) / 128)).astype(int)
     steps = steps + 128 * extra_cycles
     grid_index = np.r_[0, np.cumsum(steps)]
@@ -203,7 +250,7 @@ def epocx_grid(eeg: dict, diag_stream: dict) -> dict:
         rates.append(float(1 / fit[0]))
     return {"t": t_grid, "x": x_grid, "missing": missing, "grid_index": grid_index, "breaks": breaks,
             "residual_ms": residual_ms, "rates": rates, "matched": matched, "x_received": x,
-            "diag_values": diag_values, "diag_col": col}
+            "diag_values": diag_values, "diag_col": col, "rate_guess_hz": rate_guess}
 
 
 def load_epocx(path: str, key: str = "epocx") -> Run:
@@ -240,10 +287,25 @@ def _epocx(by_name: dict, key: str) -> Run:
             np.abs((received - devices.EPOCX_OFFSET_UV) / devices.EPOCX.lsb_uv - raw_counts).max()),
         "raw_count_range": [int(raw_counts.min()), int(raw_counts.max())],
         "rail_samples": int(((raw_counts <= -32768) | (raw_counts >= 32767)).sum()),
+        # Absolute LSL clock of this run's first sample.  ``t`` is deliberately
+        # relative, but two recordings made in one sitting share the LSL clock,
+        # so this is what lets them be placed on a single wall-clock timeline.
+        "lsl_t0": float(t0),
     }
+    # ``rates`` is normally one fit per contiguous packet segment.  Keep the
+    # whole-recording fit as a fallback for a very short/degenerate recording
+    # where no segment clears the fitter's minimum.
+    rate = float(np.median(grid["rates"])) if grid["rates"] else float(grid["rate_guess_hz"])
+    extra["nominal_srate_hz"] = FS
+    extra["effective_srate_hz"] = rate
+    extra["rate_residual_ms_percentiles"] = dict(zip(
+        ["min", "p1", "p50", "p99", "max"],
+        np.percentile(grid["residual_ms"], [0, 1, 50, 99, 100]).round(3).tolist()))
+    extra["marker_shift_s"] = float(devices.EPOCX.timing.latency_s)
     quality = _quality(by_name, "Epoc X", t0)
-    return Run("epocx", key, t_grid - t0, x_grid, labels, diag, _markers(by_name, t0),
-               quality["cq"], quality["eq"], quality["pow"], extra)
+    return Run("epocx", key, t_grid - t0, x_grid, labels, diag,
+               _markers(by_name, t0, devices.EPOCX.timing.latency_s),
+               quality["cq"], quality["eq"], quality["pow"], extra, rate)
 
 
 # ---------------------------------------------------------------------------
@@ -267,9 +329,28 @@ def _flex(by_name: dict, key: str) -> Run:
     diag_values = np.asarray(diag_stream["time_series"], float)
     diag = {name: diag_values[:, i] for i, name in enumerate(stream_labels(diag_stream))}
 
+    rate, residual = _effective_rate(t_abs)
+    # Flex timestamps have small packet-level jitter.  The samples themselves are
+    # sequential, so expose a regular whole-recording grid for event matching and
+    # use the robust fitted rate as the MNE sampling frequency.
+    t = np.arange(len(t_abs), dtype=float) / rate
     quality = _quality(by_name, "Epoc Flex 1.0", t0)
-    run = Run("flex", key, t_abs - t0, np.asarray(eeg["time_series"], float), stream_labels(eeg),
-              diag, _markers(by_name, t0), quality["cq"], quality["eq"], quality["pow"])
+    extra = {"lsl_t0": float(t0), "nominal_srate_hz": FS,
+             "effective_srate_hz": float(rate),
+             # Keep the packet-clock residual separately from the regular grid
+             # exposed as ``Run.t``.  The latter is intentionally regular for
+             # MNE; the residual is what QC needs to show whether the recorded
+             # timestamps stayed linear over the session.
+             "timestamp_residual_ms": residual * 1000.0,
+             "rate_residual_ms_percentiles": dict(zip(
+                 ["min", "p1", "p50", "p99", "max"],
+                 np.percentile(residual * 1000, [0, 1, 50, 99, 100]).round(3).tolist())),
+             "marker_shift_s": float(devices.FLEX.timing.latency_s)}
+    run = Run("flex", key, t, np.asarray(eeg["time_series"], float), stream_labels(eeg),
+              diag, _markers(by_name, t0, devices.FLEX.timing.latency_s), quality["cq"],
+              quality["eq"], quality["pow"], extra, rate)
+    # See the EPOC X loader: the absolute origin, so two sessions recorded on one
+    # cap wetting can be put on a common timeline.
     if FLEX_DISPLAY_STREAM in by_name:
         run.extra["ignored_display_stream"] = FLEX_DISPLAY_STREAM
     cap = eeg["info"]["desc"][0].get("cap", [{}])[0]

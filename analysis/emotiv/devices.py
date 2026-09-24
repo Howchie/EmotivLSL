@@ -48,7 +48,12 @@ class Processing:
     supplies every number and policy they use.
     """
 
-    reference: str  # "recorded" or "average"
+    # "recorded", "average", or a tuple of channel names for a linked reference
+    # (the mean of those channels is subtracted from every channel).  A linked
+    # reference needs its own electrodes to be good, so ``reference_fallback``
+    # says what to use when one of them is flagged bad; the choice actually
+    # applied is always recorded in ``Cleaned.parameters``.
+    reference: str | tuple[str, ...]
     reference_why: str
     bad_channels: str  # "drop" or "interpolate"
     ica_band: tuple[float, float]
@@ -56,7 +61,7 @@ class Processing:
     epoch: tuple[float, float]
     baseline: tuple[float, float]
     # 1-s peak-to-peak thresholds, in microvolts, scaled to this headset's noise floor.
-    gross_uv: float  # excluded from the ICA fit only
+    gross_uv: float  # excluded from ICA and final epoch analysis
     residual_uv: float  # annotated BAD_residual after ICA
     pop_uv: float  # electrode-pop diagnostic
     # Flex only.  Its wire format is a seven-bit delta, so the encoder rails at
@@ -71,6 +76,51 @@ class Processing:
     heog: tuple[str, str] | None
     validated: bool
     source: str
+    # Used only when ``reference`` is a linked pair and one of its electrodes is bad.
+    reference_fallback: str = "average"
+    # Artifact detection runs in this reference, not in the analysis one, so which
+    # windows are rejected does not depend on how the ERP is referenced.  It
+    # matters whenever the analysis reference is a small set of electrodes: a
+    # linked mastoid pushes its own electrodes' noise into every channel, and a
+    # threshold applied after it would reject on the reference's quality rather
+    # than on the data's.  None means "the analysis reference".
+    detection_reference: str | tuple[str, ...] | None = None
+    # What to do about a *single epoch* on an otherwise good electrode, where the
+    # methods that need a rectangular trials x times x channels block (the
+    # cluster test) cannot represent a missing cell.  This is a separate decision
+    # from ``bad_channels``, which is about an electrode that is bad throughout.
+    # "complete" uses only the epochs with every channel usable; "interpolate"
+    # fills the cell from its neighbours and keeps the epoch.  It follows the
+    # density of the cap, not the analysis: splines over the EPOC X's 13-sensor
+    # ring are guesswork, while on the 32-electrode Flex cap a sporadic cell has
+    # close neighbours.  ROI measurements never need this -- they average over
+    # whichever channels survived and report a per-channel trial count.
+    bad_cells: str = "complete"
+    # Two guards on the per-channel exclusion, so it degrades into whole-epoch
+    # and whole-channel rejection instead of quietly measuring a stump.
+    #
+    # Drop the epoch when more than this share of the analysed channels are
+    # unusable in it.  ``preprocess.RESIDUAL_MIN_CHANNELS`` already annotates any
+    # window where two channels are over *at the same instant*, so what reaches
+    # here is channels failing at different moments inside one epoch; this is the
+    # backstop for that, in the spirit of autoreject's kappa.
+    epoch_max_bad_share: float = 0.25
+    # Mark a channel bad outright when it is unusable in more than this share of
+    # epochs, and re-epoch with it dropped or interpolated per ``bad_channels``.
+    # This is the epoch-level twin of ``preprocess.CHANNEL_BAD_SHARE``, which
+    # works on task windows; an epoch spans more than one window plus its padding,
+    # so the same electrode scores two to three times as high here, and an
+    # electrode can fail this test while passing that one.
+    #
+    # 10% is calibrated, not picked.  It flags exactly two electrodes across the
+    # four sessions and both are known bad: gng.xdf's F4 at 11.0% (the failing
+    # saline pad that had to be hand-listed in MANUAL_BADS -- its window share is
+    # only 4.2%, under CHANNEL_BAD_SHARE, so this test is what recovers it
+    # independently; next worst in that session 1.8%) and oddball_flex's FT10 at
+    # 10.4% (next worst 6.6%).  The FT10 margin is the tight one; if a future
+    # session puts a good electrode near 10% this cut needs re-deriving rather
+    # than nudging.
+    channel_max_bad_epoch_share: float = 0.10
 
 
 @dataclass(frozen=True)
@@ -140,7 +190,10 @@ EPOCX_PROCESSING = Processing(
         "The 14 sensors form a ring with no midline site, so a broad vertex-centred "
         "component such as the P3 reaches all of them.  An average reference subtracts "
         "most of it and flips P7/P8/O1/O2 negative.  Measured on gng.xdf: every channel "
-        "positive at the Go-NoGo peak, channel mean +4.2 uV."),
+        "positive at the Go-NoGo peak, channel mean +4.2 uV.  That all-positive pattern "
+        "is the montage, not an artifact: restricting gng_flex.xdf to these 14 sites in "
+        "its recorded reference reproduces it (14/14 positive, +2.9 uV), while the full "
+        "32-channel cap shows the same component falling to zero at the mastoid ring."),
     bad_channels="drop",  # spline interpolation from 13 sparse sensors blurs the ROIs
     ica_band=(1.0, 30.0),
     erp_band=(0.1, 20.0),  # 20-30 Hz here is mostly EMG and sensor noise
@@ -160,33 +213,64 @@ EPOCX_PROCESSING = Processing(
 )
 
 # ---------------------------------------------------------------------------
-# Derived on the Flex, NOT carried over from the EPOC X: this headset uses an
-# average reference, a wider ERP band and interpolated bad channels.  The
+# Derived on the Flex, NOT carried over from the EPOC X: this headset uses a
+# wider ERP band, interpolated bad channels and a rail-fraction test.  The
 # thresholds below were re-derived on data/GnG/gng_flex.xdf the way the EPOC X's
 # were -- the 99th percentile of clean-channel 1-s peak-to-peak on task time
 # after ICA, via preprocess.sliding_p2p.
 FLEX_PROCESSING = Processing(
-    reference="average",
+    reference="recorded",
+    # The recorded reference needs no electrode that might be bad, so the
+    # fallback never fires; it is "recorded" rather than "average" so that a
+    # session overriding the reference with a linked pair degrades to something
+    # that preserves broad components instead of to the one reference that does
+    # not.  Never fall back to the average reference on this cap.
+    reference_fallback="recorded",
+    # Artifact detection stays in the average reference whatever the analysis
+    # reference is, so the surviving trials are a property of the data.  With a
+    # single-ended reference that also stops the CMS electrode's own noise from
+    # driving rejection; when this was coupled it cost 8 of 62 Go trials.
+    detection_reference="average",
     reference_why=(
-        "Measured on the oddball runs: the average reference roughly tripled SNR "
-        "against the recorded TP9 reference, the opposite of the EPOC X.  The cap "
-        "covers the head with midline sites, so averaging does not sit on top of "
-        "the component of interest.  Re-checked on a P3, the component an average "
-        "reference is most likely to erase: on gng_flex.xdf the Go-NoGo difference "
-        "over the central ROI is +0.58 uV [-0.60, +1.72] in the average reference "
-        "against +0.14 uV [-2.91, +3.02] in the recorded one -- the recorded "
-        "reference has the larger peak but a 2.5x wider interval, and every ROI "
-        "peaks on the same sample there, which is the signature of a common-mode "
-        "component rather than a topography."),
+        "TP9 is the CMS reference and TP10 the DRL driven ground on this cap, so the "
+        "recorded reference already IS a left-mastoid reference -- the same scheme the "
+        "EPOC X uses, which makes the two headsets directly comparable.  TP9/TP10 are "
+        "not available as data; FT9/FT10 and PO9/PO10 are the nearest sites to the "
+        "mastoids but are ordinary electrodes over cortex.\n"
+        "The choice that matters is average vs anything else.  All 32 electrodes sit "
+        "above the P3's null, so the average reference subtracts a large positive "
+        "spatial mean at the peak and takes most of the component with it.  On "
+        "gng_flex.xdf, with artifact detection held fixed so all 62 Go trials survive "
+        "in every condition, the central-ROI Go-NoGo peak and its +/-average SNR are: "
+        "recorded TP9 4.79 uV (4.2), average 1.85 (2.2), linked FT9+FT10 4.97 (3.3), "
+        "linked PO9+PO10 4.59 (5.1), linked T7+T8 2.45 (1.8), linked P7+P8 1.77 (3.0).  "
+        "Every reference over sites near the null agrees on ~4.4-5.0 uV; the average is "
+        "the outlier, and T7/T8 and P7/P8 fail because they carry 1.8-4.4 uV of the "
+        "component themselves.\n"
+        "Recorded is the default because it is the only candidate that cannot fail: "
+        "PO9 and PO10 are the two flakiest electrodes on this cap in both sessions "
+        "recorded so far (1.6/1.2 pops per minute on gng_flex.xdf, 1.9/2.5 and flagged "
+        "bad outright on oddball_flex.xdf), which is where the cap seats worst, and "
+        "FT9/FT10 are reliable but FT9 itself carries +1.9 uV of the P3.  The one thing "
+        "recorded gives up is that a single-ended reference puts the CMS electrode's "
+        "own noise into every channel: the NoGo N1/P2 peak-to-peak SNR is 4.6, against "
+        "12.9 for linked PO9+PO10 and 5.7 for FT9+FT10.  For an N1/P2-only analysis on "
+        "a session where the posterior electrodes measured well, --reference PO9,PO10 "
+        "is worth taking; for the P3, and for anything compared with the EPOC X, use "
+        "the default."),
     bad_channels="interpolate",
+    bad_cells="interpolate",
     ica_band=(1.0, 30.0),
     erp_band=(0.1, 30.0),
     epoch=(-0.2, 1.0),
     baseline=(-0.2, 0.0),
     gross_uv=300.0,  # the 99.9th percentile of 1-30 Hz task p2p is 299 uV
-    # Per-channel 99th percentiles of post-ICA task-time 1-s p2p run 24-109 uV
-    # (median 54), so 120 clears every clean channel.  flex_sanity's flat 150 uV
-    # was inherited, not measured, and let through windows this now annotates.
+    # A physiological ceiling for "too contaminated to contribute to an ERP", not
+    # a percentile of this session: the EPOC X's 100 uV happens to sit at its own
+    # p99 (104), whereas gng_flex.xdf's p99 is 281 uV in the detection reference,
+    # so 120 costs it ~17% of task windows against the EPOC X's ~5%.  That gap is
+    # the recording, not the threshold -- this cap's saline pads were drying, the
+    # posterior ones worst.  Do not raise it to match the session; re-wet instead.
     residual_uv=120.0,
     pop_uv=60.0,
     # Rail fraction is the Flex's own dead-electrode flag and catches things the
@@ -212,8 +296,10 @@ FLEX_PROCESSING = Processing(
     # session's cap does not, eog_proxies warns rather than skipping silently.
     heog=("F7", "F8"),
     validated=True,
-    source="re-derived on data/GnG/gng_flex.xdf (2026-09-16): reference checked "
-           "against a P3, thresholds from post-ICA task-time 1-s p2p percentiles",
+    source="re-derived on data/GnG/gng_flex.xdf (2026-09-16): reference chosen by "
+           "effect-to-noise on the P3 and the N1/P2 and by electrode reliability "
+           "across gng_flex.xdf and oddball_flex.xdf, thresholds from post-ICA "
+           "task-time 1-s p2p percentiles",
 )
 # ---------------------------------------------------------------------------
 

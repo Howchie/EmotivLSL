@@ -80,11 +80,17 @@ BURST_S = (0.030, 0.330)
 def load_run(path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """Return the sample grid times, the EEG matrix, the tone marker times and diagnostics.
 
-    This is the canonical EPOC X loader; nothing here corrects timing, because the
-    chain latency is what the test exists to check rather than assume.
+    This is the canonical EPOC X loader.  It normally shifts markers by the
+    profile's hardware delay, but this measurement explicitly removes that shift
+    because the chain latency is what the test exists to estimate.
     """
 
     run = em.load_epocx(path)
+    # The canonical loader shifts markers by the already measured hardware
+    # delay.  This script is the hardware-timing measurement itself, so recover
+    # the raw marker clock before estimating the chain/audio split; otherwise it
+    # would subtract the profile value from itself.
+    run.shift_markers(-run.marker_shift_s)
     tones = run.markers.loc[run.markers["value"].str.startswith(MARKER_PREFIX), "time"].to_numpy()
     if not len(tones):
         raise ValueError(f"no markers starting with {MARKER_PREFIX!r}")
@@ -94,7 +100,8 @@ def load_run(path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
         "samples": int(len(run.t)),
         "duration_s": run.duration_s,
         "interpolated_samples": int(run.filled.sum()),
-        "fitted_rate_hz": run.extra["segment_rates_hz"],
+        "fitted_rate_hz": float(run.sfreq_hz),
+        "nominal_rate_hz": float(em.FS),
         "arrival_residual_sd_ms": float(np.std(residual)),
         "tones": int(len(tones)),
     }
@@ -118,8 +125,8 @@ def eeg_chain_s(override: float | None) -> tuple[float, str]:
 # Measurement
 
 
-def highpass(sig: np.ndarray) -> np.ndarray:
-    return sosfiltfilt(butter(4, HIGHPASS_HZ, btype="high", fs=FS, output="sos"), sig)
+def highpass(sig: np.ndarray, sfreq: float = FS) -> np.ndarray:
+    return sosfiltfilt(butter(4, HIGHPASS_HZ, btype="high", fs=sfreq, output="sos"), sig)
 
 
 def epoch(t: np.ndarray, sig: np.ndarray, tones: np.ndarray, lags: np.ndarray) -> np.ndarray:
@@ -128,7 +135,8 @@ def epoch(t: np.ndarray, sig: np.ndarray, tones: np.ndarray, lags: np.ndarray) -
     return np.array([np.interp(lags, t - e, sig) for e in tones])
 
 
-def pickup_ranking(t: np.ndarray, x: np.ndarray, tones: np.ndarray) -> pd.DataFrame:
+def pickup_ranking(t: np.ndarray, x: np.ndarray, tones: np.ndarray,
+                   sfreq: float = FS) -> pd.DataFrame:
     """Rank channels by tone-locked energy, to find which sensor the plug is on.
 
     The plugged channel stands out by orders of magnitude, so this is a reliable
@@ -136,10 +144,10 @@ def pickup_ranking(t: np.ndarray, x: np.ndarray, tones: np.ndarray) -> pd.DataFr
     on the file.
     """
 
-    lags = np.arange(BASELINE_S[0], BURST_S[1] + 0.05, 1 / FS)
+    lags = np.arange(BASELINE_S[0], BURST_S[1] + 0.05, 1 / sfreq)
     rows = []
     for j, label in enumerate(LABELS):
-        power = (epoch(t, highpass(x[:, j]), tones, lags) ** 2).mean(axis=0)
+        power = (epoch(t, highpass(x[:, j], sfreq), tones, lags) ** 2).mean(axis=0)
         base = np.sqrt(power[lags < BASELINE_S[1]].mean())
         burst = np.sqrt(power[(lags > BURST_S[0]) & (lags < BURST_S[1])].max())
         rows.append({"channel": label, "baseline_uv": base, "burst_uv": burst,
@@ -212,9 +220,10 @@ def summarise(frame: pd.DataFrame, chain_s: float, n_boot: int, rng) -> dict:
 # Reporting
 
 
-def plot(path: Path, t, sig, tones, frame, summary, channel, ranking) -> None:
+def plot(path: Path, t, sig, tones, frame, summary, channel, ranking,
+         sfreq: float = FS) -> None:
     good = frame[frame["contact"]]
-    lags = np.arange(BASELINE_S[0], BURST_S[1] + 0.17, 1 / FS)
+    lags = np.arange(BASELINE_S[0], BURST_S[1] + 0.17, 1 / sfreq)
     rms = np.sqrt((epoch(t, sig, tones, lags) ** 2).mean(axis=0))
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
@@ -285,15 +294,16 @@ def main() -> None:
 
     t, x, tones, diagnostics = load_run(args.xdf)
     chain, chain_source = eeg_chain_s(args.eeg_chain)
-    ranking = pickup_ranking(t, x, tones)
+    sfreq = float(diagnostics["fitted_rate_hz"])
+    ranking = pickup_ranking(t, x, tones, sfreq)
     channel = args.channel or ranking.iloc[0]["channel"]
     cross = args.cross_check or ranking.iloc[1]["channel"]
 
-    sig = highpass(x[:, LABELS.index(channel)])
+    sig = highpass(x[:, LABELS.index(channel)], sfreq)
     frame = edge_times(t, sig, tones)
     summary = summarise(frame, chain, args.bootstrap, rng)
 
-    cross_sig = highpass(x[:, LABELS.index(cross)])
+    cross_sig = highpass(x[:, LABELS.index(cross)], sfreq)
     cross_summary = summarise(edge_times(t, cross_sig, tones), chain, args.bootstrap, rng)
 
     results = {
@@ -307,11 +317,12 @@ def main() -> None:
     }
     (args.out / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     frame.to_csv(args.out / "trials.csv", index=False)
-    plot(args.out / "headphone_timing.png", t, sig, tones, frame, summary, channel, ranking)
+    plot(args.out / "headphone_timing.png", t, sig, tones, frame, summary, channel, ranking, sfreq)
 
     print(f"{args.xdf}")
     print(f"  {diagnostics['samples']} samples, {diagnostics['duration_s']:.1f} s, "
           f"{diagnostics['interpolated_samples']} interpolated, "
+          f"effective rate {sfreq:.6f} Hz, "
           f"arrival residual SD {diagnostics['arrival_residual_sd_ms']:.2f} ms")
     print(f"  plug on {channel} ({ranking.iloc[0]['ratio']:.0f}x baseline); "
           f"runner-up {cross} ({ranking.iloc[1]['ratio']:.0f}x)")

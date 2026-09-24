@@ -1,0 +1,49 @@
+session,device,test,channels,n_test,n_ref,p,sign,t_start,t_end,n_channels,picks,epochs_available,all_channels_usable
+gng_epocx,epocx,all / device,13,70,303,0.002,positive,0.2109375,0.328125,12,AF3 F7 F3 FC5 T7 P7 O1 O2 P8 T8 FC6 F8 AF4,"[72, 315]",373
+gng_epocx,epocx,all / complete,13,70,303,0.002,positive,0.2109375,0.328125,12,AF3 F7 F3 FC5 T7 P7 O1 O2 P8 T8 FC6 F8 AF4,"[72, 315]",373
+gng_epocx,epocx,core / complete,13,70,303,0.002,positive,0.2109375,0.328125,12,AF3 F7 F3 FC5 T7 P7 O1 O2 P8 T8 FC6 F8 AF4,"[72, 315]",373
+gng_epocx,epocx,ROI F3+F4,1,72,315,0.0015,positive,0.234375,0.3125,0,F3,"[72, 315]",373
+gng_epocx,epocx,"ROI F3+F4 [P3 window, +tail]",1,72,315,0.001,positive,0.234375,0.3125,0,F3,"[72, 315]",373
+gng_epocx,epocx,ROI EPOC X frontal ROI,3,71,310,0.002,positive,0.2265625,0.3125,0,F3 FC5 FC6,"[72, 315]",373
+gng_epocx,epocx,"ROI EPOC X frontal ROI [P3 window, +tail]",3,71,310,0.001,positive,0.2265625,0.3125,0,F3 FC5 FC6,"[72, 315]",373
+gng_epocx_2,epocx,all / device,14,68,265,0.044,positive,0.21875,0.2421875,10,AF3 F7 F3 FC5 T7 P7 O1 O2 P8 T8 FC6 F4 F8 AF4,"[74, 293]",333
+gng_epocx_2,epocx,all / complete,14,68,265,0.044,positive,0.21875,0.2421875,10,AF3 F7 F3 FC5 T7 P7 O1 O2 P8 T8 FC6 F4 F8 AF4,"[74, 293]",333
+gng_epocx_2,epocx,core / complete,14,68,265,0.044,positive,0.21875,0.2421875,10,AF3 F7 F3 FC5 T7 P7 O1 O2 P8 T8 FC6 F4 F8 AF4,"[74, 293]",333
+gng_epocx_2,epocx,ROI F3+F4,2,72,286,0.055,negative,0.59375,0.609375,0,F3 F4,"[74, 293]",333
+gng_epocx_2,epocx,"ROI F3+F4 [P3 window, +tail]",2,72,286,0.0435,positive,0.2265625,0.234375,0,F3 F4,"[74, 293]",333
+gng_epocx_2,epocx,ROI EPOC X frontal ROI,4,73,291,0.0295,negative,0.5859375,0.609375,0,F3 F4 FC5 FC6,"[74, 293]",333
+gng_epocx_2,epocx,"ROI EPOC X frontal ROI [P3 window, +tail]",4,73,291,0.0425,positive,0.2265625,0.234375,0,F3 F4 FC5 FC6,"[74, 293]",333
+gng_flex,flex,all / device,32,76,313,0.054,positive,0.25,0.3046875,10,C3 T7 FC1 FC5 FT9 F3 F7 Fp1 Pz Cz O1 PO9 P3 P7 CP1 CP5 C4 T8 FC2 FC6 FT10 F4 F8 Fp2 Oz Fz O2 PO10 P4 P8 CP2 CP6,"[76, 313]",332
+gng_flex,flex,all / complete,32,65,267,0.0115,positive,0.2578125,0.34375,16,C3 T7 FC1 FC5 FT9 F3 F7 Fp1 Pz Cz O1 PO9 P3 P7 CP1 CP5 C4 T8 FC2 FC6 FT10 F4 F8 Fp2 Oz Fz O2 PO10 P4 P8 CP2 CP6,"[76, 313]",332
+gng_flex,flex,core / complete,17,73,301,0.04,positive,0.25,0.3046875,8,C3 FC1 FC5 F3 Pz Cz P3 CP1 CP5 C4 FC2 FC6 F4 Fz P4 CP2 CP6,"[76, 313]",332
+gng_flex,flex,ROI Fz,1,76,313,0.094,negative,0.15625,0.1640625,0,Fz,"[76, 313]",332
+gng_flex,flex,"ROI Fz [P3 window, +tail]",1,76,313,,-,,,0,Fz,"[76, 313]",332
+gng_flex,flex,ROI Cz,1,76,313,0.011,negative,0.15625,0.1875,0,Cz,"[76, 313]",332
+gng_flex,flex,"ROI Cz [P3 window, +tail]",1,76,313,0.0415,positive,0.2890625,0.296875,0,Cz,"[76, 313]",332
+gng_flex,flex,ROI Pz,1,76,311,0.06,positive,0.328125,0.3359375,0,Pz,"[76, 313]",332
+gng_flex,flex,"ROI Pz [P3 window, +tail]",1,76,311,0.0275,positive,0.328125,0.3359375,0,Pz,"[76, 313]",332
+gng_flex,flex,ROI F3+F4,2,75,309,0.018,negative,0.890625,0.9140625,0,F3 F4,"[76, 313]",332
+gng_flex,flex,"ROI F3+F4 [P3 window, +tail]",2,75,309,0.0585,positive,0.25,0.25,0,F3 F4,"[76, 313]",332
+gng_flex,flex,ROI FCz-ish (FC1+FC2),2,75,311,0.117,negative,0.15625,0.1640625,0,FC1 FC2,"[76, 313]",332
+gng_flex,flex,"ROI FCz-ish (FC1+FC2) [P3 window, +tail]",2,75,311,,-,,,0,FC1 FC2,"[76, 313]",332
+gng_flex,flex,ROI central ROI,4,76,313,0.06,positive,0.328125,0.3359375,0,Cz CP1 CP2 Pz,"[76, 313]",332
+gng_flex,flex,"ROI central ROI [P3 window, +tail]",4,76,313,0.024,positive,0.328125,0.3359375,0,Cz CP1 CP2 Pz,"[76, 313]",332
+gng_flex,flex,ROI EPOC X frontal ROI,4,76,313,0.0125,negative,0.890625,0.9140625,0,F3 F4 FC5 FC6,"[76, 313]",332
+gng_flex,flex,"ROI EPOC X frontal ROI [P3 window, +tail]",4,76,313,0.0075,positive,0.2421875,0.265625,0,F3 F4 FC5 FC6,"[76, 313]",332
+oddball_flex,flex,all / device,29,58,470,0.033,positive,0.21875,0.234375,20,C3 T7 FC1 FC5 FT9 F3 F7 Fp1 Pz Cz O1 P3 P7 CP1 CP5 C4 T8 FC2 FC6 F4 F8 Fp2 Oz Fz O2 P4 P8 CP2 CP6,"[58, 470]",430
+oddball_flex,flex,all / complete,29,48,382,0.035,positive,0.3359375,0.3515625,24,C3 T7 FC1 FC5 FT9 F3 F7 Fp1 Pz Cz O1 P3 P7 CP1 CP5 C4 T8 FC2 FC6 F4 F8 Fp2 Oz Fz O2 P4 P8 CP2 CP6,"[58, 470]",430
+oddball_flex,flex,core / complete,17,55,437,0.017,positive,0.1953125,0.234375,16,C3 FC1 FC5 F3 Pz Cz P3 CP1 CP5 C4 FC2 FC6 F4 Fz P4 CP2 CP6,"[58, 470]",430
+oddball_flex,flex,ROI Fz,1,58,470,0.019,positive,0.21875,0.234375,0,Fz,"[58, 470]",430
+oddball_flex,flex,"ROI Fz [P3 window, +tail]",1,58,470,0.009,positive,0.21875,0.234375,0,Fz,"[58, 470]",430
+oddball_flex,flex,ROI Cz,1,58,468,0.045,positive,0.2265625,0.234375,0,Cz,"[58, 470]",430
+oddball_flex,flex,"ROI Cz [P3 window, +tail]",1,58,468,0.0205,positive,0.2265625,0.234375,0,Cz,"[58, 470]",430
+oddball_flex,flex,ROI Pz,1,58,467,0.0195,positive,0.21875,0.234375,0,Pz,"[58, 470]",430
+oddball_flex,flex,"ROI Pz [P3 window, +tail]",1,58,467,0.0125,positive,0.21875,0.234375,0,Pz,"[58, 470]",430
+oddball_flex,flex,ROI F3+F4,2,58,463,0.013,positive,0.21875,0.234375,0,F3 F4,"[58, 470]",430
+oddball_flex,flex,"ROI F3+F4 [P3 window, +tail]",2,58,463,0.0065,positive,0.21875,0.234375,0,F3 F4,"[58, 470]",430
+oddball_flex,flex,ROI FCz-ish (FC1+FC2),2,58,462,0.025,positive,0.21875,0.234375,0,FC1 FC2,"[58, 470]",430
+oddball_flex,flex,"ROI FCz-ish (FC1+FC2) [P3 window, +tail]",2,58,462,0.014,positive,0.21875,0.234375,0,FC1 FC2,"[58, 470]",430
+oddball_flex,flex,ROI central ROI,4,58,469,0.019,positive,0.21875,0.234375,0,Cz CP1 CP2 Pz,"[58, 470]",430
+oddball_flex,flex,"ROI central ROI [P3 window, +tail]",4,58,469,0.0095,positive,0.21875,0.234375,0,Cz CP1 CP2 Pz,"[58, 470]",430
+oddball_flex,flex,ROI EPOC X frontal ROI,4,58,470,0.015,positive,0.21875,0.234375,0,F3 F4 FC5 FC6,"[58, 470]",430
+oddball_flex,flex,"ROI EPOC X frontal ROI [P3 window, +tail]",4,58,470,0.0055,positive,0.21875,0.234375,0,F3 F4 FC5 FC6,"[58, 470]",430

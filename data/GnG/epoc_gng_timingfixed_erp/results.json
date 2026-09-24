@@ -1,0 +1,949 @@
+{
+  "recording": "data/GnG/epoc_gng_timingfixed.xdf",
+  "device": "epocx",
+  "primary_roi": "frontal",
+  "window_s": [
+    0.2,
+    0.4
+  ],
+  "integrity": {
+    "device": "epocx",
+    "samples_received": 95730,
+    "grid_samples": 95730,
+    "missing_samples": 0,
+    "duration_s": 747.498575835547,
+    "dropped_repeats": 118,
+    "reader_missing_reports": 0,
+    "reader_resets": 0,
+    "diag_rows_unmatched": 0,
+    "headset_rate_hz": [
+      128.06579583512004
+    ],
+    "effective_srate_hz": 128.06579583512004,
+    "nominal_srate_hz": 128.0,
+    "arrival_residual_ms_percentiles": {
+      "min": -0.87,
+      "p1": -0.8,
+      "p50": -0.19,
+      "p99": 3.48,
+      "max": 6.22
+    },
+    "decoder_max_fraction": 0.0018559806794655742,
+    "raw_count_range": [
+      -22002,
+      28022
+    ],
+    "rail_samples": 0,
+    "pct_1s_windows_ptp_over_400uv": {
+      "AF3": 0.27,
+      "F7": 0.27,
+      "F3": 0.4,
+      "FC5": 0.27,
+      "T7": 0.27,
+      "P7": 0.0,
+      "O1": 0.0,
+      "O2": 0.0,
+      "P8": 0.27,
+      "T8": 0.27,
+      "FC6": 0.27,
+      "F4": 0.13,
+      "F8": 0.27,
+      "AF4": 0.27
+    }
+  },
+  "preprocessing": {
+    "bad_channels": [],
+    "good_channels": [
+      "AF3",
+      "F7",
+      "F3",
+      "FC5",
+      "T7",
+      "P7",
+      "O1",
+      "O2",
+      "P8",
+      "T8",
+      "FC6",
+      "F4",
+      "F8",
+      "AF4"
+    ],
+    "ica_excluded": [
+      1,
+      4
+    ],
+    "rail_pct_by_channel": {},
+    "ica_corr_max": {
+      "VEOG": 0.708713777946805,
+      "HEOG": 0.7429126857061348,
+      "VEOG_slow": 0.7848695762859184,
+      "HEOG_slow": 0.9473233626381775
+    },
+    "ica_corr_excluded": {
+      "VEOG": [
+        -0.708713777946805,
+        0.027793590180247556
+      ],
+      "HEOG": [
+        0.033802777491609405,
+        -0.7429126857061348
+      ],
+      "VEOG_slow": [
+        -0.3492697371619706,
+        -0.01814171417366125
+      ],
+      "HEOG_slow": [
+        0.06688021495280634,
+        -0.9473233626381775
+      ]
+    },
+    "pops_per_min": {
+      "AF3": 0.0,
+      "F7": 0.0,
+      "F3": 0.0,
+      "FC5": 0.0,
+      "T7": 0.09205750338577438,
+      "P7": 0.0,
+      "O1": 0.2761725101573232,
+      "O2": 0.0,
+      "P8": 0.0,
+      "T8": 0.18411500677154877,
+      "FC6": 0.09205750338577438,
+      "F4": 0.0,
+      "F8": 0.0,
+      "AF4": 0.0
+    },
+    "pct_task_gross": 0.5256103956645883,
+    "pct_task_residual": 4.851698618961599,
+    "task_minutes": 11.166785979095561,
+    "residual_share_by_channel": {
+      "AF3": 0.017923823749066467,
+      "F7": 0.021657953696788648,
+      "F3": 0.022404779686333084,
+      "FC5": 0.020164301717699777,
+      "T7": 0.026138909634055265,
+      "P7": 0.016430171769977596,
+      "O1": 0.024645257654966394,
+      "O2": 0.020164301717699777,
+      "P8": 0.0268857356235997,
+      "T8": 0.037341299477221805,
+      "FC6": 0.0351008215085885,
+      "F4": 0.03435399551904406,
+      "F8": 0.027632561613144136,
+      "AF4": 0.026138909634055265
+    },
+    "parameters": {
+      "device": "epocx",
+      "profile_source": "EPOCX_ERP_PIPELINE.md, derived on data/GnG/gng.xdf",
+      "profile_validated": true,
+      "ica_band": [
+        1.0,
+        30.0
+      ],
+      "erp_band": [
+        0.1,
+        20.0
+      ],
+      "gross_uv": 300.0,
+      "residual_uv": 100.0,
+      "sfreq_hz": 128.06579583512004,
+      "nominal_sfreq_hz": 128.0,
+      "win_s": 1.0,
+      "step_s": 0.5,
+      "fill_pad": [
+        0.25,
+        0.5
+      ],
+      "eog_r": 0.5,
+      "eog_r_slow": 0.8,
+      "channel_bad_share": 0.05,
+      "residual_min_channels": 4,
+      "pop_uv": 60.0,
+      "rail_pct": null,
+      "manual_bads": {},
+      "reference": "recorded",
+      "reference_requested": "recorded",
+      "reference_why": "The 14 sensors form a ring with no midline site, so a broad vertex-centred component such as the P3 reaches all of them.  An average reference subtracts most of it and flips P7/P8/O1/O2 negative.  Measured on gng.xdf: every channel positive at the Go-NoGo peak, channel mean +4.2 uV.  That all-positive pattern is the montage, not an artifact: restricting gng_flex.xdf to these 14 sites in its recorded reference reproduces it (14/14 positive, +2.9 uV), while the full 32-channel cap shows the same component falling to zero at the mastoid ring.",
+      "detection_reference": "recorded",
+      "bad_channel_handling": "drop",
+      "eog_proxies_used": [
+        "HEOG",
+        "HEOG_slow",
+        "VEOG",
+        "VEOG_slow"
+      ],
+      "seed": 7
+    }
+  },
+  "timing": {
+    "additional_latency_s": 0.0,
+    "shift_samples": 0,
+    "sfreq_hz": 128.06579583512004,
+    "hardware_marker_shift_s": 0.06975544868138632,
+    "timing_source": "caller",
+    "reference": "recorded",
+    "bad_channel_handling": "drop",
+    "bad_channels": [],
+    "bad_channels_from_epoch_share": {},
+    "channel_max_bad_epoch_share": 0.1,
+    "epoch_max_bad_share": 0.25,
+    "epochs_dropped_bad_channel_share": 3,
+    "drops": {
+      "BAD_residual": 23,
+      "BAD_gross": 3,
+      "BAD_channel_share": 3
+    },
+    "n_epochs": 367,
+    "n_by_condition": {
+      "go": 74,
+      "nogo": 293
+    },
+    "n_per_channel": {
+      "AF3": 367,
+      "F7": 367,
+      "F3": 365,
+      "FC5": 367,
+      "T7": 363,
+      "P7": 367,
+      "O1": 358,
+      "O2": 367,
+      "P8": 363,
+      "T8": 358,
+      "FC6": 359,
+      "F4": 360,
+      "F8": 366,
+      "AF4": 366
+    },
+    "n_per_channel_min": 358,
+    "n_per_channel_max": 367,
+    "channel_epochs_excluded": {
+      "F3": 2,
+      "T7": 4,
+      "O1": 9,
+      "P8": 4,
+      "T8": 9,
+      "FC6": 8,
+      "F4": 7,
+      "F8": 1,
+      "AF4": 1
+    },
+    "n_epochs_all_channels_usable": 333,
+    "bad_channels_per_epoch_max": 3,
+    "audio_offset_s": 0.0,
+    "chain_latency_s": 0.06975544868138632,
+    "effective_marker_to_sound_s": 0.06975544868138632
+  },
+  "behaviour": {
+    "go_trials": 80,
+    "nogo_trials": 320,
+    "counting_blocks": [
+      0
+    ],
+    "responding_blocks": [
+      1
+    ],
+    "go_trials_counting": 40,
+    "go_trials_responding": 40,
+    "hits": 36,
+    "false_alarms": 0,
+    "hit_rate": 0.9,
+    "false_alarm_rate": 0.0,
+    "rt_reference": "from the tone marker; audio-output latency for this session is unmeasured",
+    "rt_median_s": 0.3321405201620188,
+    "rt_iqr_s": [
+      0.31516291289019965,
+      0.36574251802594515
+    ],
+    "block_marker_diagnostics": {
+      "duplicate_starts": [],
+      "unmatched_starts": [
+        "3"
+      ],
+      "unmatched_ends": [],
+      "invalid_intervals": [],
+      "overlap": false,
+      "n_complete": 2,
+      "events_outside_complete_blocks": 1
+    }
+  },
+  "rois": {
+    "frontal": {
+      "roi": [
+        "F3",
+        "F4",
+        "FC5",
+        "FC6"
+      ],
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 73,
+      "n_ref": 291,
+      "n_go": 73,
+      "n_nogo": 291,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 3,
+      "trials_without_enough_roi": [
+        1,
+        2
+      ],
+      "difference_uv": 1.2568587234528639,
+      "ci95_uv": [
+        -1.2673774699693465,
+        3.8189253390666043
+      ],
+      "window_s": [
+        0.2,
+        0.4
+      ],
+      "peak_latency_s": 0.23425458612402555,
+      "peak_latency_ci95_s": [
+        0.22644609991989137,
+        0.2889139895529648
+      ],
+      "peak_uv": 4.479242879246398,
+      "peak_fwhm_s": 0.04685091722480508,
+      "baseline_rms_uv": 0.33129849488706364,
+      "plus_minus_rms_uv": 0.6907782780988532
+    },
+    "posterior": {
+      "roi": [
+        "O1",
+        "O2",
+        "P7",
+        "P8"
+      ],
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 74,
+      "n_ref": 293,
+      "n_go": 74,
+      "n_nogo": 293,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 3,
+      "trials_without_enough_roi": [
+        0,
+        0
+      ],
+      "difference_uv": -0.06414706468796708,
+      "ci95_uv": [
+        -1.9873668044429222,
+        1.8425382805405401
+      ],
+      "window_s": [
+        0.2,
+        0.4
+      ],
+      "peak_latency_s": 0.22644609991989137,
+      "peak_latency_ci95_s": [
+        0.21863761371575718,
+        0.34357339298190415
+      ],
+      "peak_uv": 2.228569424708483,
+      "peak_fwhm_s": 0.039042431020670926,
+      "baseline_rms_uv": 0.3027799908546854,
+      "plus_minus_rms_uv": 0.5228493919394244
+    },
+    "inferior": {
+      "roi": [
+        "T7",
+        "T8",
+        "P7",
+        "P8"
+      ],
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 74,
+      "n_ref": 291,
+      "n_go": 74,
+      "n_nogo": 291,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 3,
+      "trials_without_enough_roi": [
+        0,
+        2
+      ],
+      "difference_uv": 0.12843997741615507,
+      "ci95_uv": [
+        -1.732552268134102,
+        1.9868640783432832
+      ],
+      "window_s": [
+        0.2,
+        0.4
+      ],
+      "peak_latency_s": 0.23425458612402555,
+      "peak_latency_ci95_s": [
+        0.22644609991989137,
+        0.24206307232815974
+      ],
+      "peak_uv": 2.7052708590811427,
+      "peak_fwhm_s": 0.039042431020670926,
+      "baseline_rms_uv": 0.33462660373209263,
+      "plus_minus_rms_uv": 0.5405187666374521
+    }
+  },
+  "topography_at_primary_peak": {
+    "reference": "recorded",
+    "conditions": [
+      "go",
+      "nogo"
+    ],
+    "same_sign_test_meaningful": true,
+    "per_channel_uv": {
+      "AF3": 3.6547875906449128,
+      "F7": 2.6708110033027355,
+      "F3": 3.746563258802821,
+      "FC5": 3.5751392666910315,
+      "T7": 1.7562586721604418,
+      "P7": 1.35178720566579,
+      "O1": 1.5426765115819403,
+      "O2": 1.7748662406710265,
+      "P8": 3.3965205686145414,
+      "T8": 4.5686664916040245,
+      "FC6": 5.066800530284309,
+      "F4": 5.061758542906367,
+      "F8": 3.494032701617188,
+      "AF4": 4.754284992237462
+    },
+    "per_channel_n": {
+      "AF3": [
+        74,
+        293
+      ],
+      "F7": [
+        74,
+        293
+      ],
+      "F3": [
+        74,
+        291
+      ],
+      "FC5": [
+        74,
+        293
+      ],
+      "T7": [
+        74,
+        289
+      ],
+      "P7": [
+        74,
+        293
+      ],
+      "O1": [
+        74,
+        284
+      ],
+      "O2": [
+        74,
+        293
+      ],
+      "P8": [
+        73,
+        290
+      ],
+      "T8": [
+        73,
+        285
+      ],
+      "FC6": [
+        71,
+        288
+      ],
+      "F4": [
+        72,
+        288
+      ],
+      "F8": [
+        74,
+        292
+      ],
+      "AF4": [
+        73,
+        293
+      ]
+    },
+    "channel_mean_uv": 3.3153538269131846,
+    "all_channels_same_sign": true
+  },
+  "clusters": [
+    {
+      "p": 0.038,
+      "sign": "positive",
+      "t_start": 0.21863761371575718,
+      "t_end": 0.24206307232815974,
+      "channels": [
+        "AF3",
+        "AF4",
+        "F3",
+        "F4",
+        "F7",
+        "F8",
+        "FC5",
+        "FC6",
+        "P8",
+        "T8"
+      ],
+      "mass": 97.2500870805432
+    },
+    {
+      "p": 0.137,
+      "sign": "negative",
+      "t_start": 0.7418061893927476,
+      "t_end": 0.7652316480051501,
+      "channels": [
+        "F3",
+        "F8",
+        "FC6"
+      ],
+      "mass": 31.708586975003257
+    },
+    {
+      "p": 0.1565,
+      "sign": "negative",
+      "t_start": 0.5856364653100639,
+      "t_end": 0.6090619239224664,
+      "channels": [
+        "AF4",
+        "F3",
+        "F8",
+        "FC6"
+      ],
+      "mass": 26.272433791812784
+    },
+    {
+      "p": 0.267,
+      "sign": "negative",
+      "t_start": 0.6949552721679425,
+      "t_end": 0.7027637583720766,
+      "channels": [
+        "F3",
+        "F8",
+        "FC6"
+      ],
+      "mass": 13.376211115128523
+    },
+    {
+      "p": 0.3545,
+      "sign": "negative",
+      "t_start": 0.5465940342893929,
+      "t_end": 0.5622110066976613,
+      "channels": [
+        "O1"
+      ],
+      "mass": 8.584068107177954
+    },
+    {
+      "p": 0.6965,
+      "sign": "negative",
+      "t_start": 0.39042431020670926,
+      "t_end": 0.39042431020670926,
+      "channels": [
+        "O1"
+      ],
+      "mass": 2.662290730361658
+    }
+  ],
+  "cluster_n": [
+    68,
+    265
+  ],
+  "cluster_bad_cells": "complete",
+  "clusters_complete_cases": [
+    {
+      "p": 0.038,
+      "sign": "positive",
+      "t_start": 0.21863761371575718,
+      "t_end": 0.24206307232815974,
+      "channels": [
+        "AF3",
+        "AF4",
+        "F3",
+        "F4",
+        "F7",
+        "F8",
+        "FC5",
+        "FC6",
+        "P8",
+        "T8"
+      ],
+      "mass": 97.2500870805432
+    },
+    {
+      "p": 0.137,
+      "sign": "negative",
+      "t_start": 0.7418061893927476,
+      "t_end": 0.7652316480051501,
+      "channels": [
+        "F3",
+        "F8",
+        "FC6"
+      ],
+      "mass": 31.708586975003257
+    },
+    {
+      "p": 0.1565,
+      "sign": "negative",
+      "t_start": 0.5856364653100639,
+      "t_end": 0.6090619239224664,
+      "channels": [
+        "AF4",
+        "F3",
+        "F8",
+        "FC6"
+      ],
+      "mass": 26.272433791812784
+    },
+    {
+      "p": 0.267,
+      "sign": "negative",
+      "t_start": 0.6949552721679425,
+      "t_end": 0.7027637583720766,
+      "channels": [
+        "F3",
+        "F8",
+        "FC6"
+      ],
+      "mass": 13.376211115128523
+    },
+    {
+      "p": 0.3545,
+      "sign": "negative",
+      "t_start": 0.5465940342893929,
+      "t_end": 0.5622110066976613,
+      "channels": [
+        "O1"
+      ],
+      "mass": 8.584068107177954
+    },
+    {
+      "p": 0.6965,
+      "sign": "negative",
+      "t_start": 0.39042431020670926,
+      "t_end": 0.39042431020670926,
+      "channels": [
+        "O1"
+      ],
+      "mass": 2.662290730361658
+    }
+  ],
+  "cluster_n_complete_cases": [
+    68,
+    265
+  ],
+  "nogo_n1_p2": {
+    "n_trials": 289,
+    "n1_latency_s": 0.09370183444961022,
+    "n1_ci95": [
+      0.08589334824547604,
+      0.09370183444961022
+    ],
+    "p2_latency_s": 0.17178669649095207,
+    "p2_ci95": [
+      0.1639782102868179,
+      0.18740366889922044
+    ],
+    "n1_amp_uv": -2.7572158644107176,
+    "p2_amp_uv": 3.5599879237381833
+  },
+  "blocks_primary": {
+    "block0": {
+      "roi": [
+        "F3",
+        "F4",
+        "FC5",
+        "FC6"
+      ],
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 40,
+      "n_ref": 149,
+      "n_go": 40,
+      "n_nogo": 149,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 3,
+      "trials_without_enough_roi": [
+        0,
+        0
+      ],
+      "difference_uv": -0.6499082594099411,
+      "ci95_uv": [
+        -4.031297779244151,
+        2.6627513309350634
+      ],
+      "window_s": [
+        0.2,
+        0.4
+      ],
+      "peak_latency_s": 0.23425458612402555,
+      "peak_latency_ci95_s": [
+        0.22644609991989137,
+        0.23425458612402555
+      ],
+      "peak_uv": 4.600320509611568,
+      "peak_fwhm_s": 0.039042431020670926,
+      "baseline_rms_uv": 0.8928678274942193,
+      "plus_minus_rms_uv": 0.9327740707030222,
+      "block": 0,
+      "responding": false,
+      "clusters": [
+        {
+          "p": 0.148,
+          "sign": "positive",
+          "t_start": 0.21863761371575718,
+          "t_end": 0.24206307232815974,
+          "channels": [
+            "AF3",
+            "AF4",
+            "F4",
+            "FC5",
+            "FC6",
+            "T7"
+          ],
+          "mass": 33.923784315925964
+        },
+        {
+          "p": 0.351,
+          "sign": "negative",
+          "t_start": 0.5856364653100639,
+          "t_end": 0.6090619239224664,
+          "channels": [
+            "AF4"
+          ],
+          "mass": 11.95141268309264
+        },
+        {
+          "p": 0.376,
+          "sign": "negative",
+          "t_start": 0.7105722445762108,
+          "t_end": 0.718380730780345,
+          "channels": [
+            "FC6",
+            "P8"
+          ],
+          "mass": 11.232913864631545
+        },
+        {
+          "p": 0.39,
+          "sign": "negative",
+          "t_start": 0.5934449515141981,
+          "t_end": 0.6012534377183323,
+          "channels": [
+            "F3",
+            "FC6"
+          ],
+          "mass": 10.890262870097665
+        },
+        {
+          "p": 0.4825,
+          "sign": "negative",
+          "t_start": 0.39042431020670926,
+          "t_end": 0.4060412826149776,
+          "channels": [
+            "AF4"
+          ],
+          "mass": 8.189556865760364
+        },
+        {
+          "p": 0.6,
+          "sign": "negative",
+          "t_start": 0.5856364653100639,
+          "t_end": 0.5934449515141981,
+          "channels": [
+            "O2"
+          ],
+          "mass": 5.458141155042705
+        },
+        {
+          "p": 0.6275,
+          "sign": "positive",
+          "t_start": 0.14836123787854952,
+          "t_end": 0.1561697240826837,
+          "channels": [
+            "T7"
+          ],
+          "mass": 5.369028917546412
+        },
+        {
+          "p": 0.653,
+          "sign": "negative",
+          "t_start": 0.7730401342092843,
+          "t_end": 0.7808486204134185,
+          "channels": [
+            "F3"
+          ],
+          "mass": 5.217518329002019
+        }
+      ]
+    },
+    "block1": {
+      "roi": [
+        "F3",
+        "F4",
+        "FC5",
+        "FC6"
+      ],
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 33,
+      "n_ref": 142,
+      "n_go": 33,
+      "n_nogo": 142,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 3,
+      "trials_without_enough_roi": [
+        1,
+        2
+      ],
+      "difference_uv": 3.4583687921372936,
+      "ci95_uv": [
+        -0.2787623334866447,
+        7.182759335183817
+      ],
+      "window_s": [
+        0.2,
+        0.4
+      ],
+      "peak_latency_s": 0.34357339298190415,
+      "peak_latency_ci95_s": [
+        0.21863761371575718,
+        0.3591903653901725
+      ],
+      "peak_uv": 4.898114403040304,
+      "peak_fwhm_s": 0.17178669649095207,
+      "baseline_rms_uv": 0.8029710007893014,
+      "plus_minus_rms_uv": 1.0755121295738415,
+      "block": 1,
+      "responding": true,
+      "clusters": [
+        {
+          "p": 0.0965,
+          "sign": "positive",
+          "t_start": 0.22644609991989137,
+          "t_end": 0.29672247575709904,
+          "channels": [
+            "AF4",
+            "F4",
+            "FC5",
+            "FC6",
+            "T8"
+          ],
+          "mass": 51.45446463419724
+        },
+        {
+          "p": 0.127,
+          "sign": "positive",
+          "t_start": 0.32014793436950156,
+          "t_end": 0.3591903653901725,
+          "channels": [
+            "AF4",
+            "F3",
+            "F4"
+          ],
+          "mass": 38.75363152311427
+        },
+        {
+          "p": 0.33,
+          "sign": "negative",
+          "t_start": 0.5465940342893929,
+          "t_end": 0.5622110066976613,
+          "channels": [
+            "O1"
+          ],
+          "mass": 10.024844121065064
+        },
+        {
+          "p": 0.3705,
+          "sign": "negative",
+          "t_start": 0.8511249962506261,
+          "t_end": 0.8667419686588945,
+          "channels": [
+            "F8"
+          ],
+          "mass": 8.56963144105618
+        },
+        {
+          "p": 0.372,
+          "sign": "negative",
+          "t_start": 0.7418061893927476,
+          "t_end": 0.757423161801016,
+          "channels": [
+            "F8"
+          ],
+          "mass": 8.550847285741185
+        },
+        {
+          "p": 0.463,
+          "sign": "positive",
+          "t_start": 0.22644609991989137,
+          "t_end": 0.23425458612402555,
+          "channels": [
+            "AF4"
+          ],
+          "mass": 5.627734060844351
+        },
+        {
+          "p": 0.533,
+          "sign": "negative",
+          "t_start": 0.8589334824547603,
+          "t_end": 0.8667419686588945,
+          "channels": [
+            "F7"
+          ],
+          "mass": 5.362715008912717
+        },
+        {
+          "p": 0.577,
+          "sign": "negative",
+          "t_start": 0.4607006860439169,
+          "t_end": 0.4607006860439169,
+          "channels": [
+            "O1"
+          ],
+          "mass": 2.90518995871896
+        },
+        {
+          "p": 0.6215,
+          "sign": "negative",
+          "t_start": 0.39042431020670926,
+          "t_end": 0.39042431020670926,
+          "channels": [
+            "O1"
+          ],
+          "mass": 2.775097068998169
+        },
+        {
+          "p": 0.866,
+          "sign": "negative",
+          "t_start": 0.039042431020670926,
+          "t_end": 0.039042431020670926,
+          "channels": [
+            "AF3"
+          ],
+          "mass": 2.609586753356085
+        }
+      ]
+    }
+  }
+}

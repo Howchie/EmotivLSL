@@ -16,7 +16,8 @@ from scipy.signal import butter, sosfiltfilt, welch
 from .devices import FS
 from .events import find_eye_intervals
 from .loading import Run
-from .preprocess import contiguous, flex_counts, flex_deltas, good_mask, rail_fraction
+from .preprocess import (apply_reference, contiguous, flex_counts, flex_deltas,
+                         good_mask, rail_fraction)
 
 __all__ = ["integrity", "quality_vs_noise", "alpha_spectra", "alpha_scores",
            "cortex_band_power", "pair_stats"]
@@ -44,6 +45,8 @@ def _epocx_integrity(run: Run, raw=None) -> dict:
         "reader_resets": extra["reader_resets"],
         "diag_rows_unmatched": extra["diag_rows_unmatched"],
         "headset_rate_hz": extra["segment_rates_hz"],
+        "effective_srate_hz": float(run.sfreq_hz),
+        "nominal_srate_hz": float(extra.get("nominal_srate_hz", FS)),
         "arrival_residual_ms_percentiles": dict(zip(
             ["min", "p1", "p50", "p99", "max"],
             np.percentile(res, [0, 1, 50, 99, 100]).round(2).tolist())),
@@ -52,8 +55,9 @@ def _epocx_integrity(run: Run, raw=None) -> dict:
         "rail_samples": extra["rail_samples"],
     }
     if raw is not None:
-        x = sosfiltfilt(butter(2, 0.5, btype="high", fs=FS, output="sos"), raw.get_data() * 1e6, axis=1)
-        n = int(FS)
+        sfreq = float(raw.info["sfreq"])
+        x = sosfiltfilt(butter(2, 0.5, btype="high", fs=sfreq, output="sos"), raw.get_data() * 1e6, axis=1)
+        n = int(round(sfreq))
         windows = x[:, : (x.shape[1] // n) * n].reshape(x.shape[0], -1, n)
         excursion = 100 * (np.ptp(windows, axis=2) > 400).mean(axis=1)
         out["pct_1s_windows_ptp_over_400uv"] = dict(zip(run.labels, excursion.round(2).tolist()))
@@ -78,9 +82,13 @@ def _flex_integrity(run: Run) -> dict:
     clean8 = np.convolve(filled.astype(int), np.ones(9, int), mode="valid") == 0
     step8_rms_uv = run.dev.lsb_uv * np.sqrt(np.mean(step8[clean8] ** 2, axis=0))
 
-    # Timestamp linearity: robust line through each stretch between counter resets.
+    # Timestamp linearity: fit the recorded packet clock, not the regularized
+    # ``run.t`` grid used by MNE.  The loader keeps the whole-recording fit
+    # residual so this diagnostic can still see packet-level jitter and drift.
     edges = [0, *np.flatnonzero(reset).tolist(), len(run.t)]
     residual_ms = np.full(len(run.t), np.nan)
+    packet_t = run.t + np.asarray(run.extra.get("timestamp_residual_ms",
+                                                 np.zeros(len(run.t))), float) / 1000.0
     segments = []
     for a, b in zip(edges[:-1], edges[1:]):
         if b - a < 1000:
@@ -88,8 +96,8 @@ def _flex_integrity(run: Run) -> dict:
         idx = np.arange(a, b)
         keep = np.ones(len(idx), bool)
         for _ in range(5):
-            fit = np.polyfit(idx[keep], run.t[a:b][keep], 1)
-            res = run.t[a:b] - np.polyval(fit, idx)
+            fit = np.polyfit(idx[keep], packet_t[a:b][keep], 1)
+            res = packet_t[a:b] - np.polyval(fit, idx)
             keep = np.abs(res - np.median(res[keep])) < 0.005
         residual_ms[a:b] = 1000 * res
         segments.append({"start_s": float(run.t[a]), "end_s": float(run.t[b - 1]),
@@ -104,10 +112,12 @@ def _flex_integrity(run: Run) -> dict:
         "filled_pct": float(100 * filled.mean()),
         "filled_runs": int(len(starts)),
         "filled_run_lengths": {int(k): int(v) for k, v in zip(run_lengths, run_counts)},
-        "longest_fill_s": float(lengths.max() / FS) if len(lengths) else 0.0,
+        "longest_fill_s": float(lengths.max() / run.sfreq_hz) if len(lengths) else 0.0,
         "dropped_repeats": int(((d["GAP_FLAG"] > 0) & (d["MISSING_REPORTS"] == 0)).sum()),
         "counter_resets": int(reset.sum()),
         "counter_steps_not_one": int((np.diff(d["COUNTER"].astype(int)) % 128 != 1).sum()),
+        "headset_rate_hz": float(run.sfreq_hz),
+        "rate_residual_ms_percentiles": run.extra.get("rate_residual_ms_percentiles"),
         "decoder_max_fraction": float(frac.max()),
         "decoder_delta_range": [int(whole.min()), int(whole.max())],
         "slew_saturated_pct": float(rails.mean()),
@@ -126,7 +136,8 @@ def quality_vs_noise(run: Run, raw) -> dict | None:
         return None
     x = raw.get_data() * 1e6
     x = x - x.mean(axis=0, keepdims=True)
-    hf = sosfiltfilt(butter(4, [1, 40], btype="band", fs=FS, output="sos"), x, axis=1)
+    sfreq = float(raw.info["sfreq"])
+    hf = sosfiltfilt(butter(4, [1, 40], btype="band", fs=sfreq, output="sos"), x, axis=1)
     ok = good_mask(raw)
     out = {}
     for name, frame in [("contact", run.cq), ("eeg_quality", run.eq)]:
@@ -169,18 +180,18 @@ def alpha_spectra(run: Run, raw, bads: list[str] = ()) -> tuple[pd.DataFrame, di
         return pd.DataFrame(), {}
     r = raw.copy().filter(1.0, 40.0)
     r.info["bads"] = list(bads)
-    # Follow the headset's own reference policy.  An average reference is right
-    # for the Flex cap and wrong for the EPOC X ring, the same as for ERPs.
-    if run.dev.processing.reference == "average":
-        r.set_eeg_reference("average")
+    # Follow the headset's own reference policy, exactly as the ERP path does.
+    apply_reference((r,), run.dev.processing.reference, list(bads),
+                    run.dev.processing.reference_fallback)
     x = r.get_data() * 1e6
     ok = good_mask(r)
     good = [j for j, ch in enumerate(run.labels) if ch not in bads]
-    n = int(2 * FS)
+    sfreq = float(raw.info["sfreq"])
+    n = int(round(2 * sfreq))
     rows, spectra, freqs = [], {}, None
     for iv in intervals:
-        a = int((iv["start"] + EYE_TRIM[0]) * FS)
-        b = int((iv["end"] - EYE_TRIM[1]) * FS)
+        a = int((iv["start"] + EYE_TRIM[0]) * sfreq)
+        b = int((iv["end"] - EYE_TRIM[1]) * sfreq)
         segments, rejected = [], 0
         for s in range(a, b - n + 1, n // 2):
             seg = x[:, s:s + n]
@@ -190,7 +201,7 @@ def alpha_spectra(run: Run, raw, bads: list[str] = ()) -> tuple[pd.DataFrame, di
             segments.append(seg)
         if not segments:
             continue
-        freqs, p = welch(np.stack(segments), fs=FS, nperseg=n, axis=2)
+        freqs, p = welch(np.stack(segments), fs=sfreq, nperseg=n, axis=2)
         spectra[(iv["state"], iv["pair"])] = p.mean(axis=0)
         rows.append({
             "run": run.key, "state": iv["state"], "pair": iv["pair"],
@@ -220,11 +231,14 @@ def cortex_band_power(run: Run, channels: tuple[str, ...] = ("O1", "O2")) -> dic
     if run.pow is None or not intervals:
         return None
     out = {}
+    # Only the pairs that survived find_eye_intervals; a rest block that was
+    # clicked through contributes no pair rather than a KeyError.
+    pairs = sorted({iv["pair"] for iv in intervals})
     for ch in channels:
         if f"{ch}/alpha" not in run.pow.columns:
             continue
         diffs_abs, diffs_rel = [], []
-        for pair in range(1, 5):
+        for pair in pairs:
             vals = {}
             for iv in intervals:
                 if iv["pair"] != pair:
@@ -235,9 +249,11 @@ def cortex_band_power(run: Run, channels: tuple[str, ...] = ("O1", "O2")) -> dic
                 alpha = f[f"{ch}/alpha"].median()
                 flank = (f[f"{ch}/theta"].median() + f[f"{ch}/betaL"].median()) / 2
                 vals[iv["state"]] = (alpha, alpha / flank)
+            if "closed" not in vals or "open" not in vals:
+                continue
             diffs_abs.append(10 * np.log10(vals["closed"][0] / vals["open"][0]))
             diffs_rel.append(10 * np.log10(vals["closed"][1] / vals["open"][1]))
-        out[ch] = {"alpha_closed_minus_open_db": diffs_abs,
+        out[ch] = {"pairs": pairs, "alpha_closed_minus_open_db": diffs_abs,
                    "alpha_vs_theta_betaL_closed_minus_open_db": diffs_rel}
     return out
 

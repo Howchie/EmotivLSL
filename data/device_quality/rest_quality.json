@@ -1,0 +1,674 @@
+{
+  "coverage": [
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "intervals": [
+        {
+          "state": "closed",
+          "start": 1.7464,
+          "end": 33.8166,
+          "pair": 1
+        },
+        {
+          "state": "open",
+          "start": 33.8262,
+          "end": 55.2347,
+          "pair": 1
+        }
+      ]
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "intervals": [
+        {
+          "state": "closed",
+          "start": 0.6362,
+          "end": 47.1472,
+          "pair": 1
+        },
+        {
+          "state": "open",
+          "start": 47.1552,
+          "end": 87.5808,
+          "pair": 1
+        },
+        {
+          "state": "closed",
+          "start": 87.581,
+          "end": 141.4275,
+          "pair": 2
+        },
+        {
+          "state": "open",
+          "start": 141.4276,
+          "end": 212.4209,
+          "pair": 2
+        }
+      ]
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "intervals": [
+        {
+          "state": "closed",
+          "start": 3.3955,
+          "end": 65.3501,
+          "pair": 1
+        },
+        {
+          "state": "open",
+          "start": 65.3579,
+          "end": 104.2509,
+          "pair": 1
+        },
+        {
+          "state": "closed",
+          "start": 104.2511,
+          "end": 172.9861,
+          "pair": 2
+        },
+        {
+          "state": "open",
+          "start": 172.9862,
+          "end": 235.0915,
+          "pair": 2
+        }
+      ]
+    },
+    {
+      "session": "gng_epocx_2",
+      "device": "epocx",
+      "intervals": [
+        {
+          "state": "closed",
+          "start": 0.3336,
+          "end": 47.6519,
+          "pair": 1
+        }
+      ]
+    }
+  ],
+  "per_region": [
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "closed",
+      "region": "prefrontal",
+      "n_ch": 2,
+      "hf_uv": 0.5571196239935282,
+      "p2p_uv": 14.213686950482566,
+      "ratio": 2.113719504568285,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "closed",
+      "region": "frontal",
+      "n_ch": 4,
+      "hf_uv": 0.5824697022930119,
+      "p2p_uv": 14.520072144798842,
+      "ratio": 3.116803398735988,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "closed",
+      "region": "fronto-central",
+      "n_ch": 2,
+      "hf_uv": 0.6179202974072651,
+      "p2p_uv": 14.547484475128705,
+      "ratio": 2.5057283413819285,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "closed",
+      "region": "central",
+      "n_ch": 2,
+      "hf_uv": 0.7971313040031586,
+      "p2p_uv": 19.291547422977406,
+      "ratio": 1.8205526445687905,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "closed",
+      "region": "parietal",
+      "n_ch": 2,
+      "hf_uv": 0.8173765817785791,
+      "p2p_uv": 18.865513571716342,
+      "ratio": 1.532377695168911,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "closed",
+      "region": "occipital",
+      "n_ch": 2,
+      "hf_uv": 1.2043405647331118,
+      "p2p_uv": 22.830754167688493,
+      "ratio": 1.732986080354062,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "open",
+      "region": "prefrontal",
+      "n_ch": 2,
+      "hf_uv": 0.6478872208984012,
+      "p2p_uv": 16.438075746832624,
+      "ratio": 1.3432217957355683,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "open",
+      "region": "frontal",
+      "n_ch": 4,
+      "hf_uv": 0.5701935447889639,
+      "p2p_uv": 14.08507011825358,
+      "ratio": 1.3938668756421166,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "open",
+      "region": "fronto-central",
+      "n_ch": 2,
+      "hf_uv": 0.6626991643193789,
+      "p2p_uv": 14.847327535390033,
+      "ratio": 1.4828797743968112,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "open",
+      "region": "central",
+      "n_ch": 2,
+      "hf_uv": 0.9162831809660197,
+      "p2p_uv": 20.72795249574947,
+      "ratio": 1.425522502708616,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "open",
+      "region": "parietal",
+      "n_ch": 2,
+      "hf_uv": 0.8276758138212581,
+      "p2p_uv": 21.28103447666401,
+      "ratio": 1.3211083001229302,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "open",
+      "region": "occipital",
+      "n_ch": 2,
+      "hf_uv": 1.2043311495019737,
+      "p2p_uv": 23.493866044055082,
+      "ratio": 1.4261387371666028,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx_2",
+      "device": "epocx",
+      "state": "closed",
+      "region": "prefrontal",
+      "n_ch": 2,
+      "hf_uv": 0.544120162643829,
+      "p2p_uv": 14.777013093859336,
+      "ratio": 1.8588303411843354,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx_2",
+      "device": "epocx",
+      "state": "closed",
+      "region": "frontal",
+      "n_ch": 4,
+      "hf_uv": 0.5682166599831173,
+      "p2p_uv": 15.945571299465318,
+      "ratio": 1.871729094272748,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx_2",
+      "device": "epocx",
+      "state": "closed",
+      "region": "fronto-central",
+      "n_ch": 2,
+      "hf_uv": 0.59511011519417,
+      "p2p_uv": 14.447943833402558,
+      "ratio": 1.9456054476056721,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx_2",
+      "device": "epocx",
+      "state": "closed",
+      "region": "central",
+      "n_ch": 2,
+      "hf_uv": 0.7875199326816887,
+      "p2p_uv": 26.4315732625271,
+      "ratio": 4.4829116021424555,
+      "pct_over": 1.1764705882352942
+    },
+    {
+      "session": "gng_epocx_2",
+      "device": "epocx",
+      "state": "closed",
+      "region": "parietal",
+      "n_ch": 2,
+      "hf_uv": 0.8519638921753764,
+      "p2p_uv": 21.586791271466677,
+      "ratio": 3.580102042610773,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_epocx_2",
+      "device": "epocx",
+      "state": "closed",
+      "region": "occipital",
+      "n_ch": 2,
+      "hf_uv": 1.287413272999536,
+      "p2p_uv": 26.24185335654144,
+      "ratio": 1.6677768822268155,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "prefrontal",
+      "n_ch": 4,
+      "hf_uv": 1.252922989191176,
+      "p2p_uv": 16.186623194950773,
+      "ratio": 1.9925227136402937,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "frontal",
+      "n_ch": 10,
+      "hf_uv": 1.1834271740824105,
+      "p2p_uv": 16.672455771183095,
+      "ratio": 1.7971511660131505,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "fronto-central",
+      "n_ch": 12,
+      "hf_uv": 1.2512902642714225,
+      "p2p_uv": 15.504539045764641,
+      "ratio": 1.5898500421590311,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "central",
+      "n_ch": 10,
+      "hf_uv": 1.1130571843023427,
+      "p2p_uv": 14.114531358857928,
+      "ratio": 1.6818269160861665,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "centro-parietal",
+      "n_ch": 8,
+      "hf_uv": 1.144803455413413,
+      "p2p_uv": 13.95886403739707,
+      "ratio": 1.5238089101049943,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "parietal",
+      "n_ch": 10,
+      "hf_uv": 1.7409090139979413,
+      "p2p_uv": 18.218657390275126,
+      "ratio": 1.702808487768955,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "occipital",
+      "n_ch": 10,
+      "hf_uv": 2.355756870897417,
+      "p2p_uv": 34.0320911120435,
+      "ratio": 1.7466065430025723,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "prefrontal",
+      "n_ch": 4,
+      "hf_uv": 2.359145624932814,
+      "p2p_uv": 23.990178214651202,
+      "ratio": 3.0587932545118712,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "frontal",
+      "n_ch": 10,
+      "hf_uv": 2.013745892836511,
+      "p2p_uv": 22.76224591325977,
+      "ratio": 2.409004074047871,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "fronto-central",
+      "n_ch": 12,
+      "hf_uv": 1.9803383564212083,
+      "p2p_uv": 20.728753623630585,
+      "ratio": 2.340376456221854,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "central",
+      "n_ch": 10,
+      "hf_uv": 1.3081156198138109,
+      "p2p_uv": 16.5486024510086,
+      "ratio": 3.042507274220876,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "centro-parietal",
+      "n_ch": 8,
+      "hf_uv": 1.2572810937031702,
+      "p2p_uv": 15.106196897211278,
+      "ratio": 2.0990997887398803,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "parietal",
+      "n_ch": 10,
+      "hf_uv": 1.7252917890088781,
+      "p2p_uv": 20.349015106162845,
+      "ratio": 2.1832045013704127,
+      "pct_over": 0.0
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "occipital",
+      "n_ch": 10,
+      "hf_uv": 2.6858770183143608,
+      "p2p_uv": 34.35809799176896,
+      "ratio": 4.010358495100275,
+      "pct_over": 2.16602646180111
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "prefrontal",
+      "n_ch": 4,
+      "hf_uv": 1.1742081182949706,
+      "p2p_uv": 16.429973288841325,
+      "ratio": 5.1203323831376055,
+      "pct_over": 0.0
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "frontal",
+      "n_ch": 10,
+      "hf_uv": 1.1834294971802177,
+      "p2p_uv": 17.40247159172622,
+      "ratio": 2.9030287059960838,
+      "pct_over": 0.0
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "fronto-central",
+      "n_ch": 12,
+      "hf_uv": 1.242095354231735,
+      "p2p_uv": 17.77843895055347,
+      "ratio": 3.0655177718900957,
+      "pct_over": 0.0
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "central",
+      "n_ch": 10,
+      "hf_uv": 1.062077020108768,
+      "p2p_uv": 13.736750740296927,
+      "ratio": 2.4776967809393473,
+      "pct_over": 0.0
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "centro-parietal",
+      "n_ch": 8,
+      "hf_uv": 1.0320475529979687,
+      "p2p_uv": 13.142162732069767,
+      "ratio": 1.7871903585583035,
+      "pct_over": 0.0
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "parietal",
+      "n_ch": 10,
+      "hf_uv": 1.404950087048253,
+      "p2p_uv": 16.00853987253194,
+      "ratio": 2.1604072184768395,
+      "pct_over": 0.0
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "closed",
+      "region": "occipital",
+      "n_ch": 10,
+      "hf_uv": 2.3642411012864155,
+      "p2p_uv": 30.14051925075491,
+      "ratio": 3.0449960418195494,
+      "pct_over": 0.0
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "prefrontal",
+      "n_ch": 4,
+      "hf_uv": 1.9164509785252635,
+      "p2p_uv": 26.167837401233307,
+      "ratio": 4.290298809058742,
+      "pct_over": 1.7391304347826086
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "frontal",
+      "n_ch": 10,
+      "hf_uv": 1.8151982977526804,
+      "p2p_uv": 27.405498121179278,
+      "ratio": 3.822551948719691,
+      "pct_over": 0.8695652173913043
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "fronto-central",
+      "n_ch": 12,
+      "hf_uv": 1.881643118551255,
+      "p2p_uv": 29.117265629694842,
+      "ratio": 3.7175879682144437,
+      "pct_over": 0.7352941176470588
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "central",
+      "n_ch": 10,
+      "hf_uv": 1.3755157819482458,
+      "p2p_uv": 21.969838661594366,
+      "ratio": 3.4284895261904493,
+      "pct_over": 0.0
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "centro-parietal",
+      "n_ch": 8,
+      "hf_uv": 1.4969465685110896,
+      "p2p_uv": 21.447008102842872,
+      "ratio": 4.355431651008163,
+      "pct_over": 1.3043478260869565
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "parietal",
+      "n_ch": 10,
+      "hf_uv": 1.965157717073369,
+      "p2p_uv": 25.89237454672982,
+      "ratio": 6.586852984803961,
+      "pct_over": 1.7391304347826086
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "open",
+      "region": "occipital",
+      "n_ch": 10,
+      "hf_uv": 4.256483513934981,
+      "p2p_uv": 54.51041779123761,
+      "ratio": 7.573157818946513,
+      "pct_over": 32.36572890025575
+    }
+  ],
+  "whole_cap": [
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "closed",
+      "hf_med": 0.657883302133911,
+      "hf_max": 1.2668887373711417,
+      "ratio_med": 2.0321638900275736,
+      "pct_over_med": 0.0,
+      "pct_over_max": 0.0
+    },
+    {
+      "session": "gng_epocx",
+      "device": "epocx",
+      "state": "open",
+      "hf_med": 0.6956467991908003,
+      "hf_max": 1.289950536991959,
+      "ratio_med": 1.425522502708616,
+      "pct_over_med": 0.0,
+      "pct_over_max": 0.0
+    },
+    {
+      "session": "gng_epocx_2",
+      "device": "epocx",
+      "state": "closed",
+      "hf_med": 0.6146138063016592,
+      "hf_max": 1.5587516786153266,
+      "ratio_med": 1.9194015218857672,
+      "pct_over_med": 0.0,
+      "pct_over_max": 2.3529411764705883
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "closed",
+      "hf_med": 1.274655988293618,
+      "hf_max": 4.408091238227115,
+      "ratio_med": 1.6601225506300161,
+      "pct_over_med": 0.0,
+      "pct_over_max": 3.0927835051546393
+    },
+    {
+      "session": "gng_flex",
+      "device": "flex",
+      "state": "open",
+      "hf_med": 1.9343177872479864,
+      "hf_max": 4.732985728973014,
+      "ratio_med": 2.5213730365601386,
+      "pct_over_med": 0.0,
+      "pct_over_max": 19.718309859154928
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "closed",
+      "hf_med": 1.2509935794846507,
+      "hf_max": 4.370610449234773,
+      "ratio_med": 2.5229392502163384,
+      "pct_over_med": 0.0,
+      "pct_over_max": 4.724409448818897
+    },
+    {
+      "session": "oddball_flex",
+      "device": "flex",
+      "state": "open",
+      "hf_med": 1.909688727287759,
+      "hf_max": 5.177053178835237,
+      "ratio_med": 4.687607787173331,
+      "pct_over_med": 1.4705882352941175,
+      "pct_over_max": 55.65217391304348
+    }
+  ]
+}

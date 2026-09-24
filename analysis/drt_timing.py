@@ -470,6 +470,13 @@ def main() -> None:
         f"{edge} / {name}": {k: v for k, v in f.items() if not k.startswith("_")} for (edge, name), f in feats.items()}
     on = feats[("onset", "electrical (mean of other channels)")]
     off = feats[("offset", "electrical (mean of other channels)")]
+    # Preserve the per-trial onset alignment used for the jitter histogram.  It
+    # is useful independently of the full diagnostic figure and lets later
+    # plots show the absolute marker-to-signal-onset distribution.
+    if "_shifts" in on:
+        pd.DataFrame({"onset_shift_s": on["_shifts"]}).to_csv(
+            args.out / "onset_shifts.csv", index=False
+        )
     pulse_width = off["edge_s"] - on["edge_s"]
     chain_from_offset = off["edge_s"] - pulse_width
     results["eeg_chain_latency_s"] = {

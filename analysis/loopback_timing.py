@@ -125,10 +125,11 @@ def channel_peaks(t: np.ndarray, x: np.ndarray, bad: np.ndarray, events: np.ndar
     return out
 
 
-def edge_peaks(t: np.ndarray, signal: np.ndarray, events: np.ndarray) -> dict:
+def edge_peaks(t: np.ndarray, signal: np.ndarray, events: np.ndarray,
+               sfreq: float = FS) -> dict:
     """Per-trial raw edge peaks; the opposite edges also estimate pulse width."""
 
-    hp = sosfiltfilt(butter(4, 5, btype="high", fs=FS, output="sos"), signal)
+    hp = sosfiltfilt(butter(4, 5, btype="high", fs=sfreq, output="sos"), signal)
     dt_sample = float(np.median(np.diff(t)))
 
     def one(base: float, sign: float) -> float:
@@ -162,11 +163,12 @@ def edge_peaks(t: np.ndarray, signal: np.ndarray, events: np.ndarray) -> dict:
     }
 
 
-def jack_edges(t: np.ndarray, x: np.ndarray, events: np.ndarray, channel: str = "T8") -> dict:
+def jack_edges(t: np.ndarray, x: np.ndarray, events: np.ndarray, channel: str = "T8",
+               sfreq: float = FS) -> dict:
     """Energy-centroid estimate for the audio loopback edges."""
 
     j = LABELS.index(channel)
-    sig = sosfiltfilt(butter(4, 5, btype="high", fs=FS, output="sos"), x[:, j])
+    sig = sosfiltfilt(butter(4, 5, btype="high", fs=sfreq, output="sos"), x[:, j])
     rows = []
     for event in events:
         a, b = np.searchsorted(t, event - 0.3), np.searchsorted(t, event + 0.5)
@@ -201,6 +203,8 @@ def analyze_drt(path: str, csv_path: str, n_boot: int, rng: np.random.Generator)
     rec = load_xdf(path)
     g, markers = rec["grid"], rec["markers"]
     t, x, bad = g["t"], g["x"], g["missing"]
+    rates = g.get("rates") or [g.get("rate_guess_hz", FS)]
+    sfreq = float(np.median(rates))
     start = np.array([ts for ts, value in markers if value == "DRTStart"])
     on_markers = np.array([ts for ts, value in markers if value == "[LED.H]_ON"])
     miss_markers = np.array([ts for ts, value in markers if value == "[LED.H]_MISS"])
@@ -211,7 +215,7 @@ def analyze_drt(path: str, csv_path: str, n_boot: int, rng: np.random.Generator)
     other = x[:, [j for j, label in enumerate(LABELS) if label != "T8"]].mean(axis=1)
     on = template_feature(t, x, bad, events, other, n_boot, rng)
     off = template_feature(t, x, bad, events + 1.0, other, n_boot, rng)
-    edge = edge_peaks(t, other, events)
+    edge = edge_peaks(t, other, events, sfreq)
     on_clean = {k: v for k, v in on.items() if k not in ("rel", "val", "trial", "template")}
     off_clean = {k: v for k, v in off.items() if k not in ("rel", "val", "trial", "template")}
     marker_minus_csv = (on_markers[:len(events)] - events) * 1000
@@ -244,8 +248,10 @@ def analyze_marker(path: str, eeg_latency_ms: float, n_boot: int, rng: np.random
     rec = load_xdf(path)
     g, markers = rec["grid"], rec["markers"]
     t, x, bad = g["t"], g["x"], g["missing"]
+    rates = g.get("rates") or [g.get("rate_guess_hz", FS)]
+    sfreq = float(np.median(rates))
     events = np.array([ts for ts, value in markers if value.startswith("Oddball-")])
-    jack = jack_edges(t, x, events, "T8")
+    jack = jack_edges(t, x, events, "T8", sfreq)
     audio_onset = jack["sound_onset_after_marker_ms"]["mean"] - eeg_latency_ms
     out = {
         "file": path, "channel": "T8", "stimulus_duration_assumed_ms": 100.0,

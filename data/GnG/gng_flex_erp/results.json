@@ -2,14 +2,14 @@
   "recording": "data/GnG/gng_flex.xdf",
   "device": "flex",
   "primary_roi": "central",
-  "p3_window_s": [
-    0.3,
-    0.5
+  "window_s": [
+    0.2,
+    0.4
   ],
   "integrity": {
     "device": "flex",
     "samples": 119352,
-    "duration_s": 932.5332984458946,
+    "duration_s": 932.5335937565864,
     "filled_samples": 71,
     "filled_pct": 0.05948790133386956,
     "filled_runs": 10,
@@ -17,10 +17,18 @@
       "7": 9,
       "8": 1
     },
-    "longest_fill_s": 0.0625,
+    "longest_fill_s": 0.06250696475146995,
     "dropped_repeats": 67,
     "counter_resets": 0,
     "counter_steps_not_one": 0,
+    "headset_rate_hz": 127.9857377783148,
+    "rate_residual_ms_percentiles": {
+      "min": -0.6,
+      "p1": -0.211,
+      "p50": -0.03,
+      "p99": 0.469,
+      "max": 0.942
+    },
     "decoder_max_fraction": 0.007352941174758598,
     "decoder_delta_range": [
       -63,
@@ -65,8 +73,8 @@
     "timestamp_segments": [
       {
         "start_s": 0.0,
-        "end_s": 932.5332984458946,
-        "rate_hz": 127.98573777829586
+        "end_s": 932.5335937565864,
+        "rate_hz": 127.9857377782958
       }
     ]
   },
@@ -109,7 +117,7 @@
     ],
     "ica_excluded": [
       2,
-      7
+      6
     ],
     "rail_pct_by_channel": {
       "C3": 0.42,
@@ -146,93 +154,103 @@
       "CP6": 0.71
     },
     "ica_corr_max": {
-      "VEOG": 0.8026458919466696,
-      "HEOG": 0.7030156401775727
+      "VEOG": 0.8036187582992427,
+      "HEOG": 0.7037889919349714,
+      "VEOG_slow": 0.6357422223986955,
+      "HEOG_slow": 0.937368475989799
     },
     "ica_corr_excluded": {
       "VEOG": [
-        -0.8026458919466696,
-        -0.07623783019706293
+        0.8036187582992427,
+        0.05819047804832879
       ],
       "HEOG": [
-        0.014963145584913844,
-        0.7030156401775727
+        -0.03082919440810488,
+        -0.7037889919349714
+      ],
+      "VEOG_slow": [
+        0.6357422223986955,
+        0.22166919012454092
+      ],
+      "HEOG_slow": [
+        -0.07999744115319063,
+        -0.937368475989799
       ]
     },
     "pops_per_min": {
-      "C3": 0.1039171909884311,
-      "T7": 0.5195859549421554,
-      "FC1": 0.1039171909884311,
-      "FC5": 0.1039171909884311,
-      "FT9": 0.4156687639537244,
-      "F3": 0.2078343819768622,
-      "F7": 0.1039171909884311,
-      "Fp1": 0.1039171909884311,
-      "Pz": 0.2078343819768622,
+      "C3": 0.10470465724081876,
+      "T7": 0.10470465724081876,
+      "FC1": 0.10470465724081876,
+      "FC5": 0.10470465724081876,
+      "FT9": 0.3141139717224563,
+      "F3": 0.20940931448163752,
+      "F7": 0.0,
+      "Fp1": 0.0,
+      "Pz": 0.0,
       "Cz": 0.0,
-      "O1": 0.9352547188958799,
-      "PO9": 1.5587578648264664,
-      "P3": 0.4156687639537244,
-      "P7": 0.5195859549421554,
-      "CP1": 0.31175157296529327,
-      "CP5": 0.5195859549421554,
+      "O1": 0.0,
+      "PO9": 0.7329326006857314,
+      "P3": 0.10470465724081876,
+      "P7": 0.0,
+      "CP1": 0.0,
+      "CP5": 0.0,
       "C4": 0.0,
-      "T8": 0.8313375279074487,
-      "FC2": 0.1039171909884311,
+      "T8": 0.0,
+      "FC2": 0.0,
       "FC6": 0.0,
-      "FT10": 1.0391719098843109,
+      "FT10": 0.5235232862040938,
       "F4": 0.0,
       "F8": 0.0,
       "Fp2": 0.0,
-      "Oz": 1.4548406738380353,
+      "Oz": 0.41881862896327504,
       "Fz": 0.0,
-      "O2": 0.6235031459305865,
-      "PO10": 1.247006291861173,
-      "P4": 0.8313375279074487,
-      "P8": 0.7274203369190176,
-      "CP2": 0.4156687639537244,
-      "CP6": 0.1039171909884311
+      "O2": 0.0,
+      "PO10": 0.5235232862040938,
+      "P4": 0.0,
+      "P8": 0.0,
+      "CP2": 0.0,
+      "CP6": 0.0
     },
-    "pct_task_gross": 15.970056144728634,
-    "pct_task_residual": 16.566664776271764,
-    "task_minutes": 11.479817708333334,
+    "pct_task_gross": 13.678921597134183,
+    "pct_task_residual": 1.3270682375929006,
+    "task_minutes": 11.196429838263823,
     "residual_share_by_channel": {
-      "C3": 0.01818181818181818,
-      "T7": 0.025454545454545455,
-      "FC1": 0.01818181818181818,
-      "FC5": 0.01890909090909091,
-      "FT9": 0.03127272727272727,
-      "F3": 0.02327272727272727,
-      "F7": 0.02909090909090909,
-      "Fp1": 0.027636363636363636,
-      "Pz": 0.024,
-      "Cz": 0.016,
-      "O1": 0.03781818181818182,
-      "PO9": 0.0669090909090909,
-      "P3": 0.024,
-      "P7": 0.02327272727272727,
-      "CP1": 0.02181818181818182,
-      "CP5": 0.017454545454545455,
-      "C4": 0.013818181818181818,
-      "T8": 0.032,
-      "FC2": 0.011636363636363636,
-      "FC6": 0.017454545454545455,
-      "FT10": 0.04363636363636364,
-      "F4": 0.020363636363636365,
-      "F8": 0.02181818181818182,
-      "Fp2": 0.02109090909090909,
-      "Oz": 0.04654545454545454,
-      "Fz": 0.017454545454545455,
-      "O2": 0.02909090909090909,
-      "PO10": 0.06327272727272727,
-      "P4": 0.028363636363636365,
-      "P8": 0.024,
-      "CP2": 0.01890909090909091,
-      "CP6": 0.01890909090909091
+      "C3": 0.002987303958177745,
+      "T7": 0.00597460791635549,
+      "FC1": 0.0037341299477221808,
+      "FC5": 0.0022404779686333084,
+      "FT9": 0.008961911874533234,
+      "F3": 0.006721433905899925,
+      "F7": 0.004480955937266617,
+      "Fp1": 0.004480955937266617,
+      "Pz": 0.0007468259895444362,
+      "Cz": 0.0,
+      "O1": 0.008961911874533234,
+      "PO9": 0.041075429424943986,
+      "P3": 0.0007468259895444362,
+      "P7": 0.0,
+      "CP1": 0.0,
+      "CP5": 0.0,
+      "C4": 0.0,
+      "T8": 0.0037341299477221808,
+      "FC2": 0.0,
+      "FC6": 0.0,
+      "FT10": 0.017923823749066467,
+      "F4": 0.0,
+      "F8": 0.0014936519790888724,
+      "Fp2": 0.0007468259895444362,
+      "Oz": 0.017923823749066467,
+      "Fz": 0.0,
+      "O2": 0.0037341299477221808,
+      "PO10": 0.0351008215085885,
+      "P4": 0.0007468259895444362,
+      "P8": 0.0,
+      "CP2": 0.0007468259895444362,
+      "CP6": 0.0
     },
     "parameters": {
       "device": "flex",
-      "profile_source": "re-derived on data/GnG/gng_flex.xdf (2026-09-16): reference checked against a P3, thresholds from post-ICA task-time 1-s p2p percentiles",
+      "profile_source": "re-derived on data/GnG/gng_flex.xdf (2026-09-16): reference chosen by effect-to-noise on the P3 and the N1/P2 and by electrode reliability across gng_flex.xdf and oddball_flex.xdf, thresholds from post-ICA task-time 1-s p2p percentiles",
       "profile_validated": true,
       "ica_band": [
         1.0,
@@ -244,6 +262,8 @@
       ],
       "gross_uv": 300.0,
       "residual_uv": 120.0,
+      "sfreq_hz": 127.9857377783148,
+      "nominal_sfreq_hz": 128.0,
       "win_s": 1.0,
       "step_s": 0.5,
       "fill_pad": [
@@ -251,42 +271,119 @@
         0.5
       ],
       "eog_r": 0.5,
-      "channel_bad_share": 0.1,
+      "eog_r_slow": 0.8,
+      "channel_bad_share": 0.05,
+      "residual_min_channels": 4,
       "pop_uv": 60.0,
       "rail_pct": 10.0,
       "manual_bads": {},
-      "reference": "average",
-      "reference_why": "Measured on the oddball runs: the average reference roughly tripled SNR against the recorded TP9 reference, the opposite of the EPOC X.  The cap covers the head with midline sites, so averaging does not sit on top of the component of interest.  Re-checked on a P3, the component an average reference is most likely to erase: on gng_flex.xdf the Go-NoGo difference over the central ROI is +0.58 uV [-0.60, +1.72] in the average reference against +0.14 uV [-2.91, +3.02] in the recorded one -- the recorded reference has the larger peak but a 2.5x wider interval, and every ROI peaks on the same sample there, which is the signature of a common-mode component rather than a topography.",
+      "reference": "recorded",
+      "reference_requested": "recorded",
+      "reference_why": "TP9 is the CMS reference and TP10 the DRL driven ground on this cap, so the recorded reference already IS a left-mastoid reference -- the same scheme the EPOC X uses, which makes the two headsets directly comparable.  TP9/TP10 are not available as data; FT9/FT10 and PO9/PO10 are the nearest sites to the mastoids but are ordinary electrodes over cortex.\nThe choice that matters is average vs anything else.  All 32 electrodes sit above the P3's null, so the average reference subtracts a large positive spatial mean at the peak and takes most of the component with it.  On gng_flex.xdf, with artifact detection held fixed so all 62 Go trials survive in every condition, the central-ROI Go-NoGo peak and its +/-average SNR are: recorded TP9 4.79 uV (4.2), average 1.85 (2.2), linked FT9+FT10 4.97 (3.3), linked PO9+PO10 4.59 (5.1), linked T7+T8 2.45 (1.8), linked P7+P8 1.77 (3.0).  Every reference over sites near the null agrees on ~4.4-5.0 uV; the average is the outlier, and T7/T8 and P7/P8 fail because they carry 1.8-4.4 uV of the component themselves.\nRecorded is the default because it is the only candidate that cannot fail: PO9 and PO10 are the two flakiest electrodes on this cap in both sessions recorded so far (1.6/1.2 pops per minute on gng_flex.xdf, 1.9/2.5 and flagged bad outright on oddball_flex.xdf), which is where the cap seats worst, and FT9/FT10 are reliable but FT9 itself carries +1.9 uV of the P3.  The one thing recorded gives up is that a single-ended reference puts the CMS electrode's own noise into every channel: the NoGo N1/P2 peak-to-peak SNR is 4.6, against 12.9 for linked PO9+PO10 and 5.7 for FT9+FT10.  For an N1/P2-only analysis on a session where the posterior electrodes measured well, --reference PO9,PO10 is worth taking; for the P3, and for anything compared with the EPOC X, use the default.",
+      "detection_reference": "average",
       "bad_channel_handling": "interpolate",
       "eog_proxies_used": [
         "HEOG",
-        "VEOG"
+        "HEOG_slow",
+        "VEOG",
+        "VEOG_slow"
       ],
       "seed": 7
     }
   },
   "timing": {
-    "chain_latency_s": 0.06975544868138632,
-    "shift_samples": 9,
-    "timing_source": "EPOC X DRT LED timing, applied to both headsets; the Flex's own 87-trial DRT run gave 64.8 ms [48.0, 67.5], which agrees to within one sample at 128 Hz",
-    "reference": "average",
+    "additional_latency_s": 0.0,
+    "shift_samples": 0,
+    "sfreq_hz": 127.9857377783148,
+    "hardware_marker_shift_s": 0.06975544868138632,
+    "timing_source": "caller",
+    "reference": "recorded",
     "bad_channel_handling": "interpolate",
     "bad_channels": [
       "O1"
     ],
+    "bad_channels_from_epoch_share": {},
+    "channel_max_bad_epoch_share": 0.1,
+    "epoch_max_bad_share": 0.25,
+    "epochs_dropped_bad_channel_share": 0,
     "drops": {
-      "BAD_residual": 69,
-      "BAD_fill": 7
+      "BAD_gross": 70,
+      "BAD_fill": 7,
+      "BAD_residual": 3
     },
-    "n_epochs": 321,
+    "n_epochs": 317,
     "n_by_condition": {
-      "go": 62,
-      "nogo": 259
-    }
+      "go": 59,
+      "nogo": 258
+    },
+    "n_per_channel": {
+      "C3": 315,
+      "T7": 315,
+      "FC1": 314,
+      "FC5": 317,
+      "FT9": 315,
+      "F3": 312,
+      "F7": 317,
+      "Fp1": 314,
+      "Pz": 315,
+      "Cz": 317,
+      "O1": 317,
+      "PO9": 302,
+      "P3": 315,
+      "P7": 317,
+      "CP1": 317,
+      "CP5": 317,
+      "C4": 317,
+      "T8": 315,
+      "FC2": 317,
+      "FC6": 317,
+      "FT10": 308,
+      "F4": 317,
+      "F8": 317,
+      "Fp2": 316,
+      "Oz": 308,
+      "Fz": 317,
+      "O2": 317,
+      "PO10": 303,
+      "P4": 317,
+      "P8": 317,
+      "CP2": 317,
+      "CP6": 317
+    },
+    "n_per_channel_min": 302,
+    "n_per_channel_max": 317,
+    "channel_epochs_excluded": {
+      "C3": 2,
+      "T7": 2,
+      "FC1": 3,
+      "FT9": 2,
+      "F3": 5,
+      "Fp1": 3,
+      "Pz": 2,
+      "PO9": 15,
+      "P3": 2,
+      "T8": 2,
+      "FT10": 9,
+      "Fp2": 1,
+      "Oz": 9,
+      "PO10": 14
+    },
+    "n_epochs_all_channels_usable": 272,
+    "bad_channels_per_epoch_max": 3,
+    "audio_offset_s": 0.0,
+    "chain_latency_s": 0.06975544868138632,
+    "effective_marker_to_sound_s": 0.06975544868138632
   },
   "behaviour": {
     "go_trials": 80,
     "nogo_trials": 320,
+    "counting_blocks": [],
+    "responding_blocks": [
+      0,
+      1
+    ],
+    "go_trials_counting": 0,
+    "go_trials_responding": 80,
     "hits": 77,
     "false_alarms": 0,
     "hit_rate": 0.9625,
@@ -296,7 +393,15 @@
     "rt_iqr_s": [
       0.33289210450950935,
       0.3894676436592225
-    ]
+    ],
+    "block_marker_diagnostics": {
+      "duplicate_starts": [],
+      "unmatched_starts": [],
+      "unmatched_ends": [],
+      "invalid_intervals": [],
+      "overlap": false,
+      "n_complete": 2
+    }
   },
   "rois": {
     "central": {
@@ -306,25 +411,40 @@
         "CP2",
         "Pz"
       ],
-      "n_go": 62,
-      "n_nogo": 259,
-      "go_minus_nogo_uv": 0.6187685180548197,
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 59,
+      "n_ref": 258,
+      "n_go": 59,
+      "n_nogo": 258,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 3,
+      "trials_without_enough_roi": [
+        0,
+        0
+      ],
+      "difference_uv": 2.466079381903843,
       "ci95_uv": [
-        -0.5894709853130464,
-        1.7644845368914754
+        -0.4587237946264756,
+        5.278054034064703
       ],
       "window_s": [
-        0.3,
-        0.5
+        0.2,
+        0.4
       ],
-      "peak_latency_s": 0.3359375,
+      "peak_latency_s": 0.33597493553915103,
       "peak_latency_ci95_s": [
-        0.3046875,
-        0.3671875
+        0.2500278590058798,
+        0.34378830613308475
       ],
-      "peak_uv": 1.8470946070345586,
-      "baseline_rms_uv": 0.29322493738121214,
-      "plus_minus_rms_uv": 0.23443278757659566
+      "peak_uv": 5.249915561605993,
+      "peak_fwhm_s": 0.04688022356360244,
+      "baseline_rms_uv": 1.0179915712362326,
+      "plus_minus_rms_uv": 0.8203116289453611
     },
     "frontal": {
       "roi": [
@@ -334,51 +454,80 @@
         "F3",
         "F4"
       ],
-      "n_go": 62,
-      "n_nogo": 259,
-      "go_minus_nogo_uv": -0.45555385951473537,
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 59,
+      "n_ref": 258,
+      "n_go": 59,
+      "n_nogo": 258,
+      "roi_channels": 5,
+      "roi_channels_per_trial_median": 5.0,
+      "roi_channels_per_trial_min": 4,
+      "trials_without_enough_roi": [
+        0,
+        0
+      ],
+      "difference_uv": 1.9345469741107932,
       "ci95_uv": [
-        -1.934005508043524,
-        0.9347926139058891
+        -1.072414999181534,
+        4.915249553564866
       ],
       "window_s": [
-        0.3,
-        0.5
+        0.2,
+        0.4
       ],
-      "peak_latency_s": 0.3046875,
+      "peak_latency_s": 0.2500278590058798,
       "peak_latency_ci95_s": [
-        0.3046875,
-        0.5
+        0.2422144884119461,
+        0.34378830613308475
       ],
-      "peak_uv": 0.2706810059035766,
-      "baseline_rms_uv": 0.1740821198183017,
-      "plus_minus_rms_uv": 0.24345630546691258
+      "peak_uv": 4.333893618150322,
+      "peak_fwhm_s": 0.07032033534540369,
+      "baseline_rms_uv": 0.9456375115958364,
+      "plus_minus_rms_uv": 0.8428752606814353
     },
     "posterior": {
       "roi": [
-        "O1",
         "Oz",
         "O2"
       ],
-      "n_go": 62,
-      "n_nogo": 259,
-      "go_minus_nogo_uv": 0.9779717811631705,
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 58,
+      "n_ref": 250,
+      "n_go": 58,
+      "n_nogo": 250,
+      "roi_channels": 2,
+      "roi_channels_per_trial_median": 2.0,
+      "roi_channels_per_trial_min": 2,
+      "trials_without_enough_roi": [
+        1,
+        8
+      ],
+      "difference_uv": 0.7521985873445729,
       "ci95_uv": [
-        -1.2157812993797255,
-        3.166973317326071
+        -1.924970071630726,
+        3.363494702114131
       ],
       "window_s": [
-        0.3,
-        0.5
+        0.2,
+        0.4
       ],
-      "peak_latency_s": 0.421875,
+      "peak_latency_s": 0.34378830613308475,
       "peak_latency_ci95_s": [
-        0.359375,
-        0.4921875
+        0.2500278590058798,
+        0.35160167672701853
       ],
-      "peak_uv": 2.7711691875275712,
-      "baseline_rms_uv": 0.50901613522552,
-      "plus_minus_rms_uv": 0.5952300354867088
+      "peak_uv": 3.137609021067427,
+      "peak_fwhm_s": 0.031253482375735,
+      "baseline_rms_uv": 1.0115432625036405,
+      "plus_minus_rms_uv": 0.7850959526762596
     },
     "inferior": {
       "roi": [
@@ -387,104 +536,263 @@
         "PO9",
         "PO10"
       ],
-      "n_go": 62,
-      "n_nogo": 259,
-      "go_minus_nogo_uv": 0.0052111379877970345,
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 54,
+      "n_ref": 250,
+      "n_go": 54,
+      "n_nogo": 250,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 3,
+      "trials_without_enough_roi": [
+        5,
+        8
+      ],
+      "difference_uv": -0.33709531283264454,
       "ci95_uv": [
-        -1.9613375141214926,
-        2.023494153990162
+        -2.537226081114404,
+        1.828108136057254
       ],
       "window_s": [
-        0.3,
-        0.5
+        0.2,
+        0.4
       ],
-      "peak_latency_s": 0.453125,
+      "peak_latency_s": 0.2578412295998136,
       "peak_latency_ci95_s": [
-        0.390625,
-        0.5
+        0.20314763544227735,
+        0.32816156494521725
       ],
-      "peak_uv": 1.4022212454025262,
-      "baseline_rms_uv": 0.26049284088014657,
-      "plus_minus_rms_uv": 0.3276347610432508
+      "peak_uv": 1.1138829413636266,
+      "peak_fwhm_s": 0.03125348237573494,
+      "baseline_rms_uv": 0.5908604947421214,
+      "plus_minus_rms_uv": 0.6317335921639183
     }
   },
   "topography_at_primary_peak": {
-    "reference": "average",
-    "same_sign_test_meaningful": false,
+    "reference": "recorded",
+    "conditions": [
+      "go",
+      "nogo"
+    ],
+    "same_sign_test_meaningful": true,
     "per_channel_uv": {
-      "C3": 1.7630162436613173,
-      "T7": -1.1587441202925457,
-      "FC1": 0.13026037152269454,
-      "FC5": -0.1878178719423012,
-      "FT9": -1.0352828243957508,
-      "F3": -0.19539114511793793,
-      "F7": -2.3417080767237253,
-      "Fp1": -1.949189136723113,
-      "Pz": 1.714021186727505,
-      "Cz": 1.3883673471219764,
-      "O1": -0.5145020964458628,
-      "PO9": -2.9388658978209663,
-      "P3": 2.0750906505042233,
-      "P7": -0.045798888558274686,
-      "CP1": 1.9870815126843555,
-      "CP5": 0.7733514333197633,
-      "C4": -0.016154880140410333,
-      "T8": 0.6609139987379054,
-      "FC2": 0.7180098249607021,
-      "FC6": -1.0947802739706523,
-      "FT10": -2.9958205236633737,
-      "F4": 0.6074166245654024,
-      "F8": -1.3680283448220738,
-      "Fp2": 0.6607122472696876,
-      "Oz": -0.2853870754454937,
-      "Fz": -0.4086881501248041,
-      "O2": 0.4122096326820573,
-      "PO10": -1.8567936311193245,
-      "P4": 0.9945246283584599,
-      "P8": 1.4057658768135979,
-      "CP2": 2.298908381604398,
-      "CP6": 0.28880088032669726
+      "C3": 5.548893152440301,
+      "T7": 2.5009443909953526,
+      "FC1": 3.8239164291269034,
+      "FC5": 3.714313956598999,
+      "FT9": 0.47287607750688476,
+      "F3": 2.2142553637499436,
+      "F7": 1.5426393851161764,
+      "Fp1": 1.7393575440675093,
+      "Pz": 5.3669602233238685,
+      "Cz": 4.644618382269567,
+      "O1": 2.0825421174398406,
+      "PO9": -0.8306775572396166,
+      "P3": 5.7683607401675605,
+      "P7": 3.9507536125047276,
+      "CP1": 5.188278286451791,
+      "CP5": 4.6129674644167125,
+      "C4": 3.416607878251515,
+      "T8": 3.5590683962186596,
+      "FC2": 4.366452579019648,
+      "FC6": 2.0600976173817833,
+      "FT10": 0.8566736007044888,
+      "F4": 3.3896871856811632,
+      "F8": 2.364538594341349,
+      "Fp2": 4.633120670039097,
+      "Oz": 2.69660440499014,
+      "Fz": 3.262913308292943,
+      "O2": 3.420453620843987,
+      "PO10": 0.69366250171517,
+      "P4": 4.322755383255291,
+      "P8": 3.982590421573162,
+      "CP2": 5.886431360716713,
+      "CP6": 3.997086688082904
     },
-    "channel_mean_uv": -0.016078190513933333,
+    "per_channel_n": {
+      "C3": [
+        58,
+        257
+      ],
+      "T7": [
+        59,
+        256
+      ],
+      "FC1": [
+        58,
+        256
+      ],
+      "FC5": [
+        59,
+        258
+      ],
+      "FT9": [
+        58,
+        257
+      ],
+      "F3": [
+        58,
+        254
+      ],
+      "F7": [
+        59,
+        258
+      ],
+      "Fp1": [
+        59,
+        255
+      ],
+      "Pz": [
+        59,
+        256
+      ],
+      "Cz": [
+        59,
+        258
+      ],
+      "O1": [
+        59,
+        258
+      ],
+      "PO9": [
+        54,
+        248
+      ],
+      "P3": [
+        59,
+        256
+      ],
+      "P7": [
+        59,
+        258
+      ],
+      "CP1": [
+        59,
+        258
+      ],
+      "CP5": [
+        59,
+        258
+      ],
+      "C4": [
+        59,
+        258
+      ],
+      "T8": [
+        59,
+        256
+      ],
+      "FC2": [
+        59,
+        258
+      ],
+      "FC6": [
+        59,
+        258
+      ],
+      "FT10": [
+        56,
+        252
+      ],
+      "F4": [
+        59,
+        258
+      ],
+      "F8": [
+        59,
+        258
+      ],
+      "Fp2": [
+        59,
+        257
+      ],
+      "Oz": [
+        58,
+        250
+      ],
+      "Fz": [
+        59,
+        258
+      ],
+      "O2": [
+        59,
+        258
+      ],
+      "PO10": [
+        54,
+        249
+      ],
+      "P4": [
+        59,
+        258
+      ],
+      "P8": [
+        59,
+        258
+      ],
+      "CP2": [
+        59,
+        258
+      ],
+      "CP6": [
+        59,
+        258
+      ]
+    },
+    "channel_mean_uv": 3.2890544931263914,
     "all_channels_same_sign": false
   },
   "clusters": [
     {
-      "p": 0.001,
+      "p": 0.044,
       "sign": "positive",
-      "t_start": 0.578125,
-      "t_end": 1.0,
-      "channels": [
-        "CP6",
-        "O1",
-        "O2",
-        "Oz",
-        "P3",
-        "P4",
-        "P7",
-        "P8",
-        "T8"
-      ],
-      "mass": 360.3652292187297
-    },
-    {
-      "p": 0.0045,
-      "sign": "negative",
-      "t_start": 0.453125,
-      "t_end": 0.6484375,
+      "t_start": 0.32816156494521725,
+      "t_end": 0.35160167672701853,
       "channels": [
         "C3",
         "CP1",
+        "CP2",
         "CP5",
-        "FC5"
+        "CP6",
+        "Cz",
+        "FC2",
+        "FC5",
+        "O2",
+        "P3",
+        "P4",
+        "P7",
+        "Pz"
       ],
-      "mass": 153.82691124577886
+      "mass": 104.69815098189001
     },
     {
-      "p": 0.014,
+      "p": 0.063,
+      "sign": "positive",
+      "t_start": 0.2422144884119461,
+      "t_end": 0.2656546001937473,
+      "channels": [
+        "C4",
+        "CP2",
+        "CP6",
+        "Cz",
+        "F4",
+        "F8",
+        "FC2",
+        "FC6",
+        "Fp2",
+        "T8"
+      ],
+      "mass": 82.66898615473188
+    },
+    {
+      "p": 0.1395,
       "sign": "negative",
-      "t_start": 0.140625,
-      "t_end": 0.203125,
+      "t_start": 0.16408078247260863,
+      "t_end": 0.17970752366047613,
       "channels": [
         "C3",
         "C4",
@@ -492,436 +800,639 @@
         "CP6",
         "Cz",
         "FC2",
-        "FC6",
-        "Fz"
+        "FC6"
       ],
-      "mass": 99.43275873830628
+      "mass": 39.02926763908678
     },
     {
-      "p": 0.0435,
+      "p": 0.197,
       "sign": "positive",
-      "t_start": 0.15625,
-      "t_end": 0.1953125,
-      "channels": [
-        "FT9",
-        "O1",
-        "O2",
-        "P7",
-        "PO10",
-        "PO9"
-      ],
-      "mass": 59.36526629166794
-    },
-    {
-      "p": 0.055,
-      "sign": "positive",
-      "t_start": 0.2890625,
-      "t_end": 0.359375,
+      "t_start": 0.2500278590058798,
+      "t_end": 0.27346797078768104,
       "channels": [
         "C3",
-        "CP1",
+        "CP5",
+        "F7",
+        "FC5"
+      ],
+      "mass": 25.520019291562857
+    },
+    {
+      "p": 0.319,
+      "sign": "positive",
+      "t_start": 0.2969080825694823,
+      "t_end": 0.30472145316341603,
+      "channels": [
+        "C3",
+        "CP5",
         "P3"
       ],
-      "mass": 53.623364177409925
+      "mass": 13.89624005704475
     },
     {
-      "p": 0.1625,
-      "sign": "positive",
-      "t_start": 0.8828125,
-      "t_end": 0.9140625,
-      "channels": [
-        "O1",
-        "P3",
-        "P7"
-      ],
-      "mass": 29.998185319581566
-    },
-    {
-      "p": 0.1805,
-      "sign": "positive",
-      "t_start": 0.4375,
-      "t_end": 0.4921875,
-      "channels": [
-        "P8"
-      ],
-      "mass": 27.61079707200997
-    },
-    {
-      "p": 0.1845,
+      "p": 0.613,
       "sign": "negative",
-      "t_start": 0.796875,
-      "t_end": 0.859375,
+      "t_start": 0.1562674118786749,
+      "t_end": 0.16408078247260863,
       "channels": [
-        "C3"
+        "Fp1"
       ],
-      "mass": 27.342405030121185
+      "mass": 5.252926876220759
     },
     {
-      "p": 0.2055,
+      "p": 0.63,
       "sign": "positive",
-      "t_start": 0.296875,
-      "t_end": 0.3515625,
+      "t_start": 0.33597493553915103,
+      "t_end": 0.33597493553915103,
       "channels": [
-        "CP2"
-      ],
-      "mass": 25.257652136366783
-    },
-    {
-      "p": 0.2595,
-      "sign": "positive",
-      "t_start": 0.7578125,
-      "t_end": 0.7890625,
-      "channels": [
-        "P3",
-        "P7"
-      ],
-      "mass": 20.652820916510862
-    },
-    {
-      "p": 0.3695,
-      "sign": "positive",
-      "t_start": 0.1328125,
-      "t_end": 0.1484375,
-      "channels": [
-        "O2",
-        "Oz"
-      ],
-      "mass": 15.46298910273719
-    },
-    {
-      "p": 0.448,
-      "sign": "positive",
-      "t_start": 0.625,
-      "t_end": 0.6484375,
-      "channels": [
-        "O2"
-      ],
-      "mass": 12.900890174574638
-    },
-    {
-      "p": 0.4835,
-      "sign": "positive",
-      "t_start": 0.2421875,
-      "t_end": 0.2578125,
-      "channels": [
-        "F4",
         "Fp2"
       ],
-      "mass": 11.894022937160857
+      "mass": 3.077214669062667
     },
     {
-      "p": 0.523,
+      "p": 0.661,
       "sign": "negative",
-      "t_start": 0.9765625,
-      "t_end": 1.0,
-      "channels": [
-        "C3"
-      ],
-      "mass": 11.185360175133159
-    },
-    {
-      "p": 0.579,
-      "sign": "positive",
-      "t_start": 0.3984375,
-      "t_end": 0.4140625,
-      "channels": [
-        "P8"
-      ],
-      "mass": 9.420175447176288
-    },
-    {
-      "p": 0.6045,
-      "sign": "negative",
-      "t_start": 0.890625,
-      "t_end": 0.90625,
+      "t_start": 0.9063509888963144,
+      "t_end": 0.9063509888963144,
       "channels": [
         "F8"
       ],
-      "mass": 8.884977511152073
+      "mass": 2.8606826195670925
     },
     {
-      "p": 0.62,
-      "sign": "negative",
-      "t_start": 0.703125,
-      "t_end": 0.71875,
-      "channels": [
-        "C3"
-      ],
-      "mass": 8.762706431142576
-    },
-    {
-      "p": 0.6735,
-      "sign": "negative",
-      "t_start": 0.2578125,
-      "t_end": 0.2734375,
-      "channels": [
-        "PO10"
-      ],
-      "mass": 8.371707293704478
-    },
-    {
-      "p": 0.7035,
-      "sign": "negative",
-      "t_start": 0.0625,
-      "t_end": 0.0703125,
-      "channels": [
-        "Fp1"
-      ],
-      "mass": 7.205906873520025
-    },
-    {
-      "p": 0.7035,
-      "sign": "negative",
-      "t_start": 0.1171875,
-      "t_end": 0.125,
-      "channels": [
-        "CP6"
-      ],
-      "mass": 7.320484549179039
-    },
-    {
-      "p": 0.7475,
-      "sign": "negative",
-      "t_start": 0.0625,
-      "t_end": 0.0703125,
-      "channels": [
-        "FC5"
-      ],
-      "mass": 6.111018954892488
-    },
-    {
-      "p": 0.7685,
+      "p": 0.8445,
       "sign": "positive",
-      "t_start": 0.03125,
-      "t_end": 0.0390625,
-      "channels": [
-        "P8"
-      ],
-      "mass": 5.959945927154575
-    },
-    {
-      "p": 0.771,
-      "sign": "negative",
-      "t_start": 0.2890625,
-      "t_end": 0.296875,
-      "channels": [
-        "PO10"
-      ],
-      "mass": 5.919169049374398
-    },
-    {
-      "p": 0.7815,
-      "sign": "negative",
-      "t_start": 0.9375,
-      "t_end": 0.9453125,
-      "channels": [
-        "C3"
-      ],
-      "mass": 5.851685244242055
-    },
-    {
-      "p": 0.7895,
-      "sign": "positive",
-      "t_start": 0.7109375,
-      "t_end": 0.71875,
-      "channels": [
-        "O2"
-      ],
-      "mass": 5.811522266626376
-    },
-    {
-      "p": 0.8185,
-      "sign": "positive",
-      "t_start": 0.84375,
-      "t_end": 0.8515625,
-      "channels": [
-        "P7"
-      ],
-      "mass": 5.682384089846405
-    },
-    {
-      "p": 0.837,
-      "sign": "positive",
-      "t_start": 0.078125,
-      "t_end": 0.0859375,
-      "channels": [
-        "PO10"
-      ],
-      "mass": 5.600526210231242
-    },
-    {
-      "p": 0.8475,
-      "sign": "positive",
-      "t_start": 0.421875,
-      "t_end": 0.4296875,
-      "channels": [
-        "P4"
-      ],
-      "mass": 5.565845800422521
-    },
-    {
-      "p": 0.859,
-      "sign": "negative",
-      "t_start": 0.5703125,
-      "t_end": 0.578125,
+      "t_start": 0.2969080825694823,
+      "t_end": 0.2969080825694823,
       "channels": [
         "CP2"
       ],
-      "mass": 5.483646647086843
-    },
-    {
-      "p": 0.888,
-      "sign": "positive",
-      "t_start": 0.1171875,
-      "t_end": 0.125,
-      "channels": [
-        "FT9"
-      ],
-      "mass": 5.343487502075316
-    },
-    {
-      "p": 0.8895,
-      "sign": "negative",
-      "t_start": 0.2265625,
-      "t_end": 0.234375,
-      "channels": [
-        "CP1"
-      ],
-      "mass": 5.3281001575562215
-    },
-    {
-      "p": 0.89,
-      "sign": "negative",
-      "t_start": 0.734375,
-      "t_end": 0.7421875,
-      "channels": [
-        "C3"
-      ],
-      "mass": 5.324996423858378
-    },
-    {
-      "p": 0.8925,
-      "sign": "negative",
-      "t_start": 0.671875,
-      "t_end": 0.6796875,
-      "channels": [
-        "C3"
-      ],
-      "mass": 5.302348513948951
-    },
-    {
-      "p": 0.9035,
-      "sign": "positive",
-      "t_start": 0.375,
-      "t_end": 0.375,
-      "channels": [
-        "P8"
-      ],
-      "mass": 3.4475735677749237
-    },
-    {
-      "p": 0.9145,
-      "sign": "positive",
-      "t_start": 0.546875,
-      "t_end": 0.546875,
-      "channels": [
-        "P8"
-      ],
-      "mass": 3.0017215954930365
-    },
-    {
-      "p": 0.9365,
-      "sign": "negative",
-      "t_start": 0.3046875,
-      "t_end": 0.3046875,
-      "channels": [
-        "FT10"
-      ],
-      "mass": 2.8211756350815933
-    },
-    {
-      "p": 0.9375,
-      "sign": "negative",
-      "t_start": 0.1015625,
-      "t_end": 0.1015625,
-      "channels": [
-        "Fp1"
-      ],
-      "mass": 2.8194696502881627
-    },
-    {
-      "p": 0.968,
-      "sign": "positive",
-      "t_start": 0.2734375,
-      "t_end": 0.2734375,
-      "channels": [
-        "C3"
-      ],
-      "mass": 2.6727660704246494
-    },
-    {
-      "p": 0.983,
-      "sign": "negative",
-      "t_start": 0.875,
-      "t_end": 0.875,
-      "channels": [
-        "C3"
-      ],
-      "mass": 2.6160124489968517
-    },
-    {
-      "p": 0.9875,
-      "sign": "positive",
-      "t_start": 0.3671875,
-      "t_end": 0.3671875,
-      "channels": [
-        "CP2"
-      ],
-      "mass": 2.6079012325614603
-    },
-    {
-      "p": 0.9915,
-      "sign": "negative",
-      "t_start": 0.3828125,
-      "t_end": 0.3828125,
-      "channels": [
-        "FC5"
-      ],
-      "mass": 2.599631680607334
+      "mass": 2.6220760984485825
     }
   ],
+  "cluster_n": [
+    59,
+    258
+  ],
+  "cluster_bad_cells": "interpolate",
+  "clusters_complete_cases": [
+    {
+      "p": 0.0175,
+      "sign": "positive",
+      "t_start": 0.2969080825694823,
+      "t_end": 0.35160167672701853,
+      "channels": [
+        "C3",
+        "CP1",
+        "CP2",
+        "CP5",
+        "CP6",
+        "Cz",
+        "FC2",
+        "FC5",
+        "O2",
+        "P3",
+        "P4",
+        "P7",
+        "P8",
+        "Pz"
+      ],
+      "mass": 173.19487514638766
+    },
+    {
+      "p": 0.0525,
+      "sign": "positive",
+      "t_start": 0.2422144884119461,
+      "t_end": 0.27346797078768104,
+      "channels": [
+        "C3",
+        "CP2",
+        "CP5",
+        "CP6",
+        "Cz",
+        "F3",
+        "F4",
+        "F8",
+        "FC2",
+        "FC5",
+        "FC6",
+        "Fp2",
+        "P3",
+        "P4",
+        "Pz",
+        "T8"
+      ],
+      "mass": 113.36934299394599
+    },
+    {
+      "p": 0.265,
+      "sign": "negative",
+      "t_start": 0.8985376183023807,
+      "t_end": 0.9141643594902481,
+      "channels": [
+        "F8",
+        "FT10",
+        "Fp2",
+        "T8"
+      ],
+      "mass": 19.34856682795856
+    },
+    {
+      "p": 0.356,
+      "sign": "negative",
+      "t_start": 0.16408078247260863,
+      "t_end": 0.17189415306654238,
+      "channels": [
+        "C4",
+        "CP6"
+      ],
+      "mass": 11.996063298370396
+    },
+    {
+      "p": 0.4715,
+      "sign": "negative",
+      "t_start": 0.5781894239510971,
+      "t_end": 0.5781894239510971,
+      "channels": [
+        "C3",
+        "CP1",
+        "CP5"
+      ],
+      "mass": 8.239229191990091
+    },
+    {
+      "p": 0.532,
+      "sign": "negative",
+      "t_start": 0.8047771711751757,
+      "t_end": 0.8125905417691094,
+      "channels": [
+        "C3"
+      ],
+      "mass": 5.905933124329595
+    },
+    {
+      "p": 0.675,
+      "sign": "positive",
+      "t_start": 0.33597493553915103,
+      "t_end": 0.33597493553915103,
+      "channels": [
+        "Fp2"
+      ],
+      "mass": 2.952909583205319
+    }
+  ],
+  "cluster_n_complete_cases": [
+    49,
+    223
+  ],
   "nogo_n1_p2": {
-    "n_trials": 259,
-    "n1_latency_s": 0.078125,
+    "n_trials": 250,
+    "n1_latency_s": 0.07813370593933745,
     "n1_ci95": [
-      0.078125,
-      0.078125
+      0.07813370593933745,
+      0.07813370593933745
     ],
-    "p2_latency_s": 0.1640625,
+    "p2_latency_s": 0.16408078247260863,
     "p2_ci95": [
-      0.15625,
-      0.171875
+      0.16408078247260863,
+      0.17189415306654238
     ],
-    "n1_amp_uv": -3.962295008365725,
-    "p2_amp_uv": 5.983369520258661
+    "n1_amp_uv": -4.593705487616877,
+    "p2_amp_uv": 5.267098882466823
   },
   "blocks_primary": {
     "block0": {
-      "n_go": 31,
-      "n_nogo": 137,
-      "go_minus_nogo_uv": 1.6149711890888272,
+      "roi": [
+        "Cz",
+        "CP1",
+        "CP2",
+        "Pz"
+      ],
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 26,
+      "n_ref": 133,
+      "n_go": 26,
+      "n_nogo": 133,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 3,
+      "trials_without_enough_roi": [
+        0,
+        0
+      ],
+      "difference_uv": 1.6407129067021688,
       "ci95_uv": [
-        0.15266534885897126,
-        3.1107998103967
+        -2.2740814507653386,
+        5.579274119633861
+      ],
+      "window_s": [
+        0.2,
+        0.4
+      ],
+      "peak_latency_s": 0.34378830613308475,
+      "peak_latency_ci95_s": [
+        0.27346797078768104,
+        0.39848190029062097
+      ],
+      "peak_uv": 5.552736533244616,
+      "peak_fwhm_s": 0.031253482375735,
+      "baseline_rms_uv": 0.8715362838029489,
+      "plus_minus_rms_uv": 1.2169679959148305,
+      "block": 0,
+      "responding": true,
+      "clusters": [
+        {
+          "p": 0.2145,
+          "sign": "positive",
+          "t_start": 0.27346797078768104,
+          "t_end": 0.30472145316341603,
+          "channels": [
+            "C3",
+            "Cz",
+            "FC2",
+            "FC6"
+          ],
+          "mass": 22.44428011984334
+        },
+        {
+          "p": 0.283,
+          "sign": "positive",
+          "t_start": 0.34378830613308475,
+          "t_end": 0.34378830613308475,
+          "channels": [
+            "C3",
+            "CP1",
+            "O2",
+            "P3",
+            "Pz"
+          ],
+          "mass": 14.70122512519225
+        },
+        {
+          "p": 0.4515,
+          "sign": "negative",
+          "t_start": 0.9297911006781157,
+          "t_end": 0.9454178418659831,
+          "channels": [
+            "PO9"
+          ],
+          "mass": 7.973328439014152
+        },
+        {
+          "p": 0.5925,
+          "sign": "positive",
+          "t_start": 0.27346797078768104,
+          "t_end": 0.2812813413816148,
+          "channels": [
+            "Fp2"
+          ],
+          "mass": 5.235147660250442
+        },
+        {
+          "p": 0.626,
+          "sign": "negative",
+          "t_start": 0.2265877472240786,
+          "t_end": 0.2265877472240786,
+          "channels": [
+            "P8"
+          ],
+          "mass": 2.954338645450629
+        },
+        {
+          "p": 0.661,
+          "sign": "negative",
+          "t_start": 0.16408078247260863,
+          "t_end": 0.16408078247260863,
+          "channels": [
+            "CP6"
+          ],
+          "mass": 2.8560336629306775
+        },
+        {
+          "p": 0.705,
+          "sign": "negative",
+          "t_start": 0.01562674118786749,
+          "t_end": 0.01562674118786749,
+          "channels": [
+            "CP5"
+          ],
+          "mass": 2.751566003143743
+        },
+        {
+          "p": 0.707,
+          "sign": "negative",
+          "t_start": 0.30472145316341603,
+          "t_end": 0.30472145316341603,
+          "channels": [
+            "PO9"
+          ],
+          "mass": 2.748799052518428
+        },
+        {
+          "p": 0.708,
+          "sign": "negative",
+          "t_start": 0.01562674118786749,
+          "t_end": 0.01562674118786749,
+          "channels": [
+            "P8"
+          ],
+          "mass": 2.745761128709712
+        },
+        {
+          "p": 0.876,
+          "sign": "positive",
+          "t_start": 0.6172562769207658,
+          "t_end": 0.6172562769207658,
+          "channels": [
+            "Fp2"
+          ],
+          "mass": 2.6273872289297673
+        }
       ]
     },
     "block1": {
-      "n_go": 31,
-      "n_nogo": 122,
-      "go_minus_nogo_uv": -0.38362697954046576,
+      "roi": [
+        "Cz",
+        "CP1",
+        "CP2",
+        "Pz"
+      ],
+      "conditions": [
+        "go",
+        "nogo"
+      ],
+      "sign": 1,
+      "n_test": 33,
+      "n_ref": 125,
+      "n_go": 33,
+      "n_nogo": 125,
+      "roi_channels": 4,
+      "roi_channels_per_trial_median": 4.0,
+      "roi_channels_per_trial_min": 4,
+      "trials_without_enough_roi": [
+        0,
+        0
+      ],
+      "difference_uv": 3.2848333139063857,
       "ci95_uv": [
-        -2.2067139428146847,
-        1.3637240020475416
+        -0.833543153597944,
+        7.2981931713894515
+      ],
+      "window_s": [
+        0.2,
+        0.4
+      ],
+      "peak_latency_s": 0.2578412295998136,
+      "peak_latency_ci95_s": [
+        0.2422144884119461,
+        0.34378830613308475
+      ],
+      "peak_uv": 6.647126425639558,
+      "peak_fwhm_s": 0.04688022356360244,
+      "baseline_rms_uv": 1.5802725266143198,
+      "plus_minus_rms_uv": 1.1466981692447686,
+      "block": 1,
+      "responding": true,
+      "clusters": [
+        {
+          "p": 0.009,
+          "sign": "positive",
+          "t_start": 0.2109610060362111,
+          "t_end": 0.2656546001937473,
+          "channels": [
+            "C3",
+            "C4",
+            "CP1",
+            "CP2",
+            "CP5",
+            "CP6",
+            "Cz",
+            "F3",
+            "F4",
+            "F7",
+            "F8",
+            "FC2",
+            "FC5",
+            "FC6",
+            "Fp1",
+            "Fp2",
+            "Fz",
+            "P3",
+            "P4",
+            "P7",
+            "P8",
+            "Pz",
+            "T8"
+          ],
+          "mass": 307.0929142141898
+        },
+        {
+          "p": 0.0855,
+          "sign": "positive",
+          "t_start": 0.32816156494521725,
+          "t_end": 0.34378830613308475,
+          "channels": [
+            "C3",
+            "CP1",
+            "CP2",
+            "CP5",
+            "CP6",
+            "Cz",
+            "F3",
+            "FC2",
+            "FC5",
+            "P3",
+            "P4",
+            "P7",
+            "P8",
+            "Pz",
+            "T8"
+          ],
+          "mass": 103.84774856083806
+        },
+        {
+          "p": 0.2255,
+          "sign": "negative",
+          "t_start": 0.7969638005812419,
+          "t_end": 0.8516573947387781,
+          "channels": [
+            "C3",
+            "Cz",
+            "F7",
+            "FC5"
+          ],
+          "mass": 37.01213562785864
+        },
+        {
+          "p": 0.3415,
+          "sign": "negative",
+          "t_start": 0.7813370593933745,
+          "t_end": 0.8047771711751757,
+          "channels": [
+            "F4",
+            "F8"
+          ],
+          "mass": 19.363217750408882
+        },
+        {
+          "p": 0.382,
+          "sign": "negative",
+          "t_start": 0.8360306535509107,
+          "t_end": 0.8672841359266457,
+          "channels": [
+            "F4",
+            "F8"
+          ],
+          "mass": 16.477746829199916
+        },
+        {
+          "p": 0.4205,
+          "sign": "negative",
+          "t_start": 0.8985376183023807,
+          "t_end": 0.9063509888963144,
+          "channels": [
+            "F4",
+            "F8",
+            "Fp2"
+          ],
+          "mass": 13.855726031566016
+        },
+        {
+          "p": 0.468,
+          "sign": "negative",
+          "t_start": 0.5703760533571633,
+          "t_end": 0.5860027945450308,
+          "channels": [
+            "C3",
+            "CP5"
+          ],
+          "mass": 11.237583143868314
+        },
+        {
+          "p": 0.56,
+          "sign": "negative",
+          "t_start": 0.7813370593933745,
+          "t_end": 0.7969638005812419,
+          "channels": [
+            "C4"
+          ],
+          "mass": 8.058763985461285
+        },
+        {
+          "p": 0.6155,
+          "sign": "positive",
+          "t_start": 0.2109610060362111,
+          "t_end": 0.2109610060362111,
+          "channels": [
+            "CP5",
+            "P7"
+          ],
+          "mass": 5.814237103946901
+        },
+        {
+          "p": 0.639,
+          "sign": "negative",
+          "t_start": 0.9063509888963144,
+          "t_end": 0.9141643594902481,
+          "channels": [
+            "C3"
+          ],
+          "mass": 5.649308683537628
+        },
+        {
+          "p": 0.6495,
+          "sign": "positive",
+          "t_start": 0.32816156494521725,
+          "t_end": 0.33597493553915103,
+          "channels": [
+            "Fp2"
+          ],
+          "mass": 5.594846407058304
+        },
+        {
+          "p": 0.654,
+          "sign": "negative",
+          "t_start": 0.17189415306654238,
+          "t_end": 0.17970752366047613,
+          "channels": [
+            "Cz"
+          ],
+          "mass": 5.561123349618866
+        },
+        {
+          "p": 0.678,
+          "sign": "negative",
+          "t_start": 0.4219220120724222,
+          "t_end": 0.42973538266635597,
+          "channels": [
+            "FC5"
+          ],
+          "mass": 5.439491059768489
+        },
+        {
+          "p": 0.698,
+          "sign": "positive",
+          "t_start": 0.2969080825694823,
+          "t_end": 0.30472145316341603,
+          "channels": [
+            "P7"
+          ],
+          "mass": 5.325279460904809
+        },
+        {
+          "p": 0.729,
+          "sign": "positive",
+          "t_start": 0.7188300946419045,
+          "t_end": 0.7188300946419045,
+          "channels": [
+            "O2"
+          ],
+          "mass": 2.939551158992914
+        },
+        {
+          "p": 0.7465,
+          "sign": "negative",
+          "t_start": 0.9141643594902481,
+          "t_end": 0.9141643594902481,
+          "channels": [
+            "Oz"
+          ],
+          "mass": 2.8564020689278204
+        },
+        {
+          "p": 0.7625,
+          "sign": "positive",
+          "t_start": 0.06250696475146995,
+          "t_end": 0.06250696475146995,
+          "channels": [
+            "O1"
+          ],
+          "mass": 2.8113263726516053
+        },
+        {
+          "p": 0.8775,
+          "sign": "negative",
+          "t_start": 0.8750975065205794,
+          "t_end": 0.8750975065205794,
+          "channels": [
+            "Oz"
+          ],
+          "mass": 2.6456056473325344
+        },
+        {
+          "p": 0.9075,
+          "sign": "negative",
+          "t_start": 0.9063509888963144,
+          "t_end": 0.9063509888963144,
+          "channels": [
+            "C4"
+          ],
+          "mass": 2.632419125101743
+        }
       ]
     }
   }
